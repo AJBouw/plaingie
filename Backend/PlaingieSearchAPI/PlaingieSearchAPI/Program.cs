@@ -2,7 +2,11 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 using PlaingieSearchAPI.ApplicationBusinessRules.Interactors.IDataContext;
+using PlaingieSearchAPI.ApplicationBusinessRules.Interactors.IRepositories;
+using PlaingieSearchAPI.ApplicationBusinessRules.Interactors.IServices;
+using PlaingieSearchAPI.ApplicationBusinessRules.UseCases;
 using PlaingieSearchAPI.InterfaceAdapters.DataContext;
+using PlaingieSearchAPI.InterfaceAdapters.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +20,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<IDbContext, DbContext>();
+builder.Services.AddScoped<IMicroControllerUnitService, MicroControllerUnitService>();
+builder.Services.AddScoped<IMicroControllerUnitRepository, MicroControllerUnitRepository>();
+
 
 var app = builder.Build();
 
