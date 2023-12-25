@@ -1,1 +1,6 @@
-/.idea/
+/Backend/PlaingieMaintenanceAPI/PlaingieMaintenanceAPI/obj/*
+/Backend/PlaingieMaintenanceAPI/PlaingieMaintenanceAPI/bin/*
+/Backend/PlaingieMaintenanceAPI/.idea/*
+/Backend/PlaingieSearchAPI/PlaingieSearchAPI/obj/*
+/Backend/PlaingieSearchAPI/PlaingieSearchAPI/bin/*
+/Backend/PlaingieSearchAPI/.idea/*
