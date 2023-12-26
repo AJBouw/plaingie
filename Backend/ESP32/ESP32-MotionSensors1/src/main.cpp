@@ -7,19 +7,20 @@
 #include "PlaingieConf.h"
 
 #pragma region | Router access credentials
-const char* WI_FI_SSID = WI_FI_SSID_CONF;
 const char* WI_FI_PASSWORD = WI_FI_PASSWORD_CONF;
+const char* WI_FI_SSID = WI_FI_SSID_CONF;
 #pragma endregion
 
 #pragma region | MQTT settings
-const char* MQTT_BROKER = MQTT_BROKER_CONF;
 const int MQTT_BROKER_TCP_PORT = MQTT_BROKER_TCP_PORT_CONF;
 const int MQTT_BROKER_WS_PORT = MQTT_BROKER_WS_PORT_CONF;
-const char* MQTT_USERNAME = MQTT_USERNAME_CONF;
+
+const char* MQTT_BROKER = MQTT_BROKER_CONF;
+const char* MQTT_CLIENT_UID_BASE = MQTT_CLIENT_UID_BASE_CONF;
 const char* MQTT_PASSWORD = MQTT_PASSWORD_CONF;
+const char* MQTT_USERNAME = MQTT_USERNAME_CONF;
 
 const uint16_t MQTT_MAX_PACKET_SIZE_OVERRIDE = 4096;
-const char* MQTT_CLIENT_UID_BASE = MQTT_CLIENT_UID_BASE_CONF;
 
 const unsigned long CALIBRATION_EVENT_INTERVAL = CALIBRATION_EVENT_INTERVAL_CONF;
 const unsigned long MOTION_EVENT_INTERVAL = MOTION_EVENT_INTERVAL_CONF;
@@ -27,9 +28,9 @@ const unsigned long MQTT_RECONNECT_EVENT_INTERVAL = MQTT_RECONNECT_EVENT_INTERVA
 #pragma endregion
 
 #pragma region | MQTT Topics
+const char* ACTIVATION_DISTRIBUTION = ACTIVATION_DISTRIBUTION_CONF;
 const char* ACTIVATION_REQUEST = ACTIVATION_REQUEST_CONF;
 const char* ACTIVATION_RESPONSE = ACTIVATION_RESPONSE_CONF;
-const char* ACTIVATION_DISTRIBUTION = ACTIVATION_DISTRIBUTION_CONF;
 
 const char* HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA = HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA_CONF;
 #pragma endregion
@@ -40,25 +41,27 @@ PubSubClient mqttClient(espWiFiClient);
 #pragma endregion
 
 #pragma region | Auxiliary variables
-unsigned long now = millis();
 unsigned long lastMessageMotionSensor_1 = 0;
 unsigned long lastReconnectToMqttBrokerAttempt = 0;
+unsigned long now = millis();
 unsigned long reconnectToMqttAttempt = 0;
 #pragma endregion
 
 #pragma region | JSON
 // Allocating JSON Document
+DynamicJsonDocument docMessage(256);
 DynamicJsonDocument docMotionSensor(256);
 DynamicJsonDocument docMotionSensorData(256);
 DynamicJsonDocument docMicroControllerUnit(256);
 
+char jsonMessage[256];
 char jsonMotionSensor[256];
 char jsonMotionSensorData[356];
 char jsonMicroControllerUnit[256];
 #pragma endregion
 
 #pragma region | Micro Controller Unit
-int _microControllerUnitUId = 2;
+int _microControllerUnitUId = 3;
 /**
  * @brief Set the Micro Controller Unit UId object
  * 
@@ -68,21 +71,7 @@ void setMicroControllerUnitUId(int uid) {
   _microControllerUnitUId = uid;
 }
 
-String macId;
-
-/**
- * @brief Set the MAC Id object
- * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
- * @return String MAC Id
- */
-String getMACId() {
-  return WiFi.macAddress(); 
-}
-
 String ipId;
-/// @brief Get the Micro Controller Unit its current IP addrress.
-/// @return IP address represented by ipId (ip_id database attribute).
-
 /**
  * @brief Set IP Id object
  * The Micro Controller Unit's IP address is known as the attribute IP Id.
@@ -92,8 +81,18 @@ String getIPId() {
   return WiFi.localIP().toString();
 }
 
-char* mqttClientUId;
+String macId;
+/**
+ * @brief Set the MAC Id object
+ * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
+ * @return String MAC Id
+ */
+String getMACId() {
+  return WiFi.macAddress(); 
+}
+
 char concatMQTTClientUId[50];
+char* mqttClientUId;
 
 /**
  * @brief Concatenate MQTT Client UId object
@@ -134,16 +133,6 @@ void setGPIO(String gpio) {
   _gpio_motion_sensor_1 = gpio.toInt();
 }
 
-String _identifier = "motion-sensor-1";
-/**
- * @brief Set the Identifier object
- * The identifier is the name of the IoT device.
- * @param identifier 
- */
-void setIdentifier(String identifier) {
-  _identifier = identifier;
-}
-
 String _category = "motion sensor";
 /**
  * @brief Set the Category object
@@ -152,6 +141,16 @@ String _category = "motion sensor";
  */
 void setCategory(String category) {
   _category = category;
+}
+
+String _identifier = "motion-sensor-1";
+/**
+ * @brief Set the Identifier object
+ * The identifier is the name of the IoT device.
+ * @param identifier 
+ */
+void setIdentifier(String identifier) {
+  _identifier = identifier;
 }
 
 String _locationDescription = "backyard fence";
@@ -175,8 +174,6 @@ void setLocationLabel(String locationLabel) {
   _locationLabel = locationLabel;
 }
 
-bool iotDeviceIsVerified = false;
-
 bool _isActive;
 /**
  * @brief Set the IoT Device State object
@@ -187,49 +184,52 @@ void setIoTDeviceState(bool isActive) {
   _isActive = isActive;
 }
 
+bool iotDeviceIsVerified = false;
+
 bool motionIsDetectedSensor_1 = false;
 bool _motionIsDetectedSensor_1;
 void getMotionSensor_1(int gpio) {
   _motionIsDetectedSensor_1 = digitalRead(gpio);
 }
 
-bool motionWasDetectedSensor_1 = false;
+bool motionWasDetectedSensor_1;
 #pragma endregion
 
 /**
  * @brief Set the IoT device object
  * 
- * @param uid 
- * @param identifier 
- * @param gpio 
- * @param category 
- * @param locationLabel 
- * @param isActive 
+ * @param uid
+ * @param category
+ * @param gpio
+ * @param identifier
+ * @param isActive
+ * @param locationDescription
+ * @param locationLabel
  */
-void setIoTDevice(int uid, String identifier, String gpio, String category, String locationLabel, String locationDescription, bool isActive) {
+void setDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
   _iotDeviceUId = uid;
-  _identifier = identifier;
-  _gpio_motion_sensor_1 = gpio.toInt();
   _category = category;
-  _locationLabel = locationLabel;
-  _locationDescription = locationDescription;
+  _gpio_motion_sensor_1 = gpio.toInt();
+  _identifier = identifier;
   _isActive = isActive;
+  _locationDescription = locationDescription;
+  _locationLabel = locationLabel;
 }
 
 /**
  * @brief Create JSON Activation Request object
  * 
- * @param mqttClientUId 
- * @param macId 
+ * @param macId
+ * @param mqttClientUId  
  * @return char* 
  */
-char* getJSONActivationRequest(String mqttClientUId, String macId) {
+char* getJSONActivationRequest(String macId, String mqttClientUId) {
   // Clear JsonDocument
   docMicroControllerUnit.clear();
 
   // Serialize a JsonDocument into a MQTT message
-  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
   docMicroControllerUnit["macId"] = macId;
+  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
@@ -374,7 +374,7 @@ void reconnectToMQTTBroker() {
       mqttClient.subscribe(ACTIVATION_RESPONSE);
       mqttClient.subscribe(ACTIVATION_DISTRIBUTION);
 
-      // mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(mqttClientUId, macId));
+      mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
     }
     else {
       Serial.print("Error MQTT connection. Trying to reconnect within 5 seconds.");
