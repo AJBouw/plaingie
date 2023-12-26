@@ -61,7 +61,7 @@ DynamicJsonDocument docMessage(256);
 DynamicJsonDocument docMicroControllerUnit(256);
 DynamicJsonDocument docMotionSensorData(256);
 
-char jsonData[256];
+char jsonMessage[256];
 char jsonLightData[256];
 char jsonMicroControllerUnit[256];
 #pragma endregion
@@ -78,9 +78,6 @@ void setMicroControllerUnitUId(int uid) {
 }
 
 String ipId;
-/// @brief Get the Micro Controller Unit its current IP addrress.
-/// @return IP address represented by ipId (ip_id database attribute).
-
 /**
  * @brief Set IP Id object
  * The Micro Controller Unit's IP address is known as the attribute IP Id.
@@ -623,7 +620,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
           // Save a few CPU cycles by passing the size of the payload
           size_t n = serializeJson(docLightData, jsonLightData);
           
-          mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
+          mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonLightData, n);
 
           previousLightStatus_1 = _currentLightStatus_1;
         }
@@ -776,8 +773,8 @@ void reconnectToMQTTBroker() {
   now = millis();
 
   while ((!mqttClient.connected()) && ((now - lastReconnectToMqttBrokerAttempt)  > MQTT_RECONNECT_EVENT_INTERVAL)) {
-    // microControllerUnitIsActivated = false;
-    // iotDeviceIsVerified = false;
+    microControllerUnitIsActivated = false;
+    iotDeviceIsVerified = false;
 
     lastReconnectToMqttBrokerAttempt = now;
     reconnectToMqttAttempt++;
