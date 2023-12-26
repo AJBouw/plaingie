@@ -9,27 +9,28 @@
 #include "PlaingieConf.h"
 
 #pragma region | Router access credentials
-const char* WI_FI_SSID = WI_FI_SSID_CONF;
 const char* WI_FI_PASSWORD = WI_FI_PASSWORD_CONF;
+const char* WI_FI_SSID = WI_FI_SSID_CONF;
 #pragma endregion
 
 #pragma region | MQTT settings
-const char* MQTT_BROKER = MQTT_BROKER_CONF;
 const int MQTT_BROKER_TCP_PORT = MQTT_BROKER_TCP_PORT_CONF;
 const int MQTT_BROKER_WS_PORT = MQTT_BROKER_WS_PORT_CONF;
-const char* MQTT_USERNAME = MQTT_USERNAME_CONF;
+
+const char* MQTT_CLIENT_UID_BASE = MQTT_CLIENT_UID_BASE_CONF;
+const char* MQTT_BROKER = MQTT_BROKER_CONF;
 const char* MQTT_PASSWORD = MQTT_PASSWORD_CONF;
+const char* MQTT_USERNAME = MQTT_USERNAME_CONF;
 
 const uint16_t MQTT_MAX_PACKET_SIZE_OVERRIDE = 4096;
-const char* MQTT_CLIENT_UID_BASE = MQTT_CLIENT_UID_BASE_CONF;
 
 const unsigned long MQTT_RECONNECT_EVENT_INTERVAL = MQTT_RECONNECT_EVENT_INTERVAL_CONF;
 #pragma endregion
 
 #pragma region | MQTT Topics
+const char* ACTIVATION_DISTRIBUTION = ACTIVATION_DISTRIBUTION_CONF;
 const char* ACTIVATION_REQUEST = ACTIVATION_REQUEST_CONF;
 const char* ACTIVATION_RESPONSE = ACTIVATION_RESPONSE_CONF;
-const char* ACTIVATION_DISTRIBUTION = ACTIVATION_DISTRIBUTION_CONF;
 
 const char* HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION = HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION_CONF;
 const char* HOME_BACKYARD_SERVO_1_COMMAND_START_POSITION = HOME_BACKYARD_SERVO_1_COMMAND_START_POSITION_CONF;
@@ -42,17 +43,19 @@ PubSubClient mqttClient(espWiFiClient);
 #pragma endregion
 
 #pragma region | Auxiliary variables
-unsigned long now = millis();
 unsigned long lastReconnectToMqttBrokerAttempt = 0;
+unsigned long now = millis();
 unsigned long reconnectToMqttAttempt = 0;
 #pragma endregion
 
 #pragma region | JSON
 // Allocating JSON Document
+DynamicJsonDocument docMessage(256);
 DynamicJsonDocument docServo(256);
 DynamicJsonDocument docServoData(256);
 DynamicJsonDocument docMicroControllerUnit(256);
 
+char jsonMessage[256];
 char jsonServo[256];
 char jsonServoData[256];
 char jsonMicroControllerUnit[256];
@@ -69,17 +72,6 @@ void setMicroControllerUnitUId(int uid) {
   _microControllerUnitUId = uid;
 }
 
-String macId;
-
-/**
- * @brief Set the MAC Id object
- * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
- * @return String MAC Id
- */
-String getMACId() {
-  return WiFi.macAddress(); 
-}
-
 String ipId;
 /// @brief Get the Micro Controller Unit its current IP addrress.
 /// @return IP address represented by ipId (ip_id database attribute).
@@ -93,8 +85,19 @@ String getIPId() {
   return WiFi.localIP().toString();
 }
 
-char* mqttClientUId;
+String macId;
+
+/**
+ * @brief Set the MAC Id object
+ * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
+ * @return String MAC Id
+ */
+String getMACId() {
+  return WiFi.macAddress(); 
+}
+
 char concatMQTTClientUId[50];
+char* mqttClientUId;
 
 /**
  * @brief Concatenate MQTT Client UId object
@@ -135,7 +138,6 @@ void setIoTDeviceUId(int uid) {
  */
 int gpio_servo_1 = 4;
 int _gpio_servo_1;
-
 /**
  * @brief Set the GPIO object
  * 
@@ -143,16 +145,6 @@ int _gpio_servo_1;
  */
 void setGPIO(String gpio) {
   _gpio_servo_1 = gpio.toInt();
-}
-
-String _identifier = "servo-1";
-/**
- * @brief Set the Identifier object
- * The identifier is the name of the device.
- * @param identifier 
- */
-void setIdentifier(String identifier) {
-  _identifier = identifier;
 }
 
 String _category = "servo";
@@ -163,6 +155,16 @@ String _category = "servo";
  */
 void setCategory(String category) {
   _category = category;
+}
+
+String _identifier = "servo-1";
+/**
+ * @brief Set the Identifier object
+ * The identifier is the name of the device.
+ * @param identifier 
+ */
+void setIdentifier(String identifier) {
+  _identifier = identifier;
 }
 
 String _locationDescription = "backyard fence";
@@ -186,8 +188,6 @@ void setLocationLabel(String locationLabel) {
   _locationLabel = locationLabel;
 }
 
-bool iotDeviceIsVerified = false;
-
 bool _isActive;
 /**
  * @brief Set the IoT Device State object
@@ -197,6 +197,8 @@ bool _isActive;
 void setIoTDeviceState(bool isActive) {
   _isActive = isActive;
 }
+
+bool iotDeviceIsVerified = false;
 #pragma endregion
 
 #pragma region | Servo Data
@@ -208,50 +210,51 @@ void setCurrentPosition(int gpio, int positionCommand) {
   }
 }
 
+int previousPosition_1 = 0;
+
 int _startPosition_1 = 0;
 void setStartPosition(int gpio, int positionCommand) {
   if (gpio == gpio_servo_1) {
     _startPosition_1 = positionCommand;
   }
 }
-
-int previousPosition_1 = 0;
 #pragma endregion
 
 /**
  * @brief Set the Device object
  * 
  * @param uid 
- * @param identifier 
- * @param gpio 
  * @param category 
- * @param locationLabel 
- * @param isActive 
+ * @param gpio 
+ * @param identifier 
+ * @param isActive
+ * @param locationDescription
+ * @param locationLabel  
  */
-void setDevice(int uid, String identifier, String gpio, String category, String locationLabel, String locationDescription, bool isActive) {
+void setDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
   _iotDeviceUId = uid;
-  _identifier = identifier;
-  _gpio_servo_1 = gpio.toInt();
   _category = category;
-  _locationLabel = locationLabel;
-  _locationDescription = locationDescription;
+  _gpio_servo_1 = gpio.toInt();
+  _identifier = identifier;
   _isActive = isActive;
+  _locationDescription = locationDescription;
+  _locationLabel = locationLabel;
 }
 
 /**
  * @brief Create JSON Activation Request object
  * 
- * @param mqttClientUId 
  * @param macId 
+ * @param mqttClientUId 
  * @return char* 
  */
-char* getJSONActivationRequest(String mqttClientUId, String macId) {
+char* getJSONActivationRequest(String macId, String mqttClientUId) {
   // Clear JsonDocument
   docMicroControllerUnit.clear();
 
   // Serialize a JsonDocument into a MQTT message
-  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
   docMicroControllerUnit["macId"] = macId;
+  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
@@ -343,11 +346,47 @@ void callback(char* topic, byte* payload, unsigned int length) {
   iotDeviceIsVerified = true;
 
   if (!microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_REQUEST)) {
-    // Handle activation response
-    microControllerUnitIsActivated = true;
+    // Clear JsonDocument
+    docMicroControllerUnit.clear();
+
+    // Cast payload to pointer-to-const to disable ArduinoJson's zero-copy mode
+    DeserializationError deserializationError = deserializeJson(docMicroControllerUnit, (const byte*)payload);
+
+    // If deserialization operation was not successful (Ok).
+    if (deserializationError) {
+      Serial.print(deserializationError.c_str());
+    }
+
+    int uid = 4;
+    int status_code = 200;
+    String information = "1";
+    String message = "OK";
+
+    if ((uid = _microControllerUnitUId) && (status_code == 200)) {
+      microControllerUnitIsActivated = true;
+    }
   }
   else if (microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_DISTRIBUTION)) {
-    // Handle distribution
+    // Clear JsonDocument
+    docMessage.clear();
+
+    // Cast payload to pointer-to-const to disable ArduinoJson's zero-copy mode
+    DeserializationError deserializationError = deserializeJson(docMessage, (const byte*)payload);
+
+    // If deserialization operation was not successful (Ok).
+    if (deserializationError) {
+      Serial.print(deserializationError.c_str());
+    }
+
+    int microControllerUnitUId = 4;
+    int iotDeviceUId = 4;
+    String category = "servo";
+    String gpio = "4";
+    String identifier = "servo-1";
+    bool isActive = true;
+    String locationDescription = "backyard fence";
+    String locationLabel = "backyard";
+
     iotDeviceIsVerified = true;
   }
   else if (microControllerUnitIsActivated && iotDeviceIsVerified) {
@@ -453,8 +492,8 @@ void reconnectToMQTTBroker() {
   now = millis();
 
   while ((!mqttClient.connected()) && ((now - lastReconnectToMqttBrokerAttempt)  > MQTT_RECONNECT_EVENT_INTERVAL)) {
-    // microControllerUnitIsActivated = false;
-    // iotDeviceIsVerified = false;
+    microControllerUnitIsActivated = false;
+    iotDeviceIsVerified = false;
 
     lastReconnectToMqttBrokerAttempt = now;
     reconnectToMqttAttempt++;
@@ -465,7 +504,7 @@ void reconnectToMQTTBroker() {
       mqttClient.subscribe(HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION);
       mqttClient.subscribe(HOME_BACKYARD_SERVO_1_COMMAND_START_POSITION);
 
-      // mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(mqttClientUId, macId));
+      mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
     }
     else {
       Serial.print("Error MQTT connection. Trying to reconnect within 5 seconds.");
