@@ -332,7 +332,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     docMicroControllerUnit.clear();
 
     // Cast payload to pointer-to-const to disable ArduinoJson's zero-copy mode
-    DeserializationError deserializationError = deserializeJson(docMicroControllerUnit), (const byte*)payload);
+    DeserializationError deserializationError = deserializeJson(docMicroControllerUnit, (const byte*)payload);
 
     // If deserialization operation was not successful (Ok).
     if (deserializationError) {
@@ -401,8 +401,8 @@ void reconnectToMQTTBroker() {
   now = millis();
 
   while ((!mqttClient.connected()) && ((now - lastReconnectToMqttBrokerAttempt)  > MQTT_RECONNECT_EVENT_INTERVAL)) {
-    // microControllerUnitIsActivated = false;
-    // iotDeviceIsVerified = false;
+    microControllerUnitIsActivated = false;
+    iotDeviceIsVerified = false;
 
     lastReconnectToMqttBrokerAttempt = now;
     reconnectToMqttAttempt++;
