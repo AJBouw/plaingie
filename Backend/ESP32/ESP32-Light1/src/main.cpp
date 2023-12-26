@@ -435,8 +435,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
     int uid = 1;
     int status_code = 200;
+    String information = "1";
     String message = "OK";
-    String information = "Successful obtained controller";
 
     if ((uid = _microControllerUnitUId) && (status_code == 200)) {
       microControllerUnitIsActivated = true;
@@ -456,12 +456,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
     int microControllerUnitUId = 1;
     int iotDeviceUId = 1;
+    String category = "light";
     String gpio = "4";
     String identifier = "light-1";
     bool isActive = true;
-    String category = "light";
-    String locationLabel = "backyard";
     String locationDescription = "backyard fence";
+    String locationLabel = "backyard";
 
     String operatingMode = "manual";
     int status = 0;
@@ -476,8 +476,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     // String gpio = docMessage["gpio"];
     // String identifier = docMessage["identifier"];
     // bool isActive = docMessage["is_active"];
-    // String locationLabel = docMessage["location_label"];
     // String locationDescription = docMessage["location_description"];
+    // String locationLabel = docMessage["location_label"];
 
     // String operatingMode = docMessage["operating_mode"];
     // int status = docMessage["status"];
@@ -734,8 +734,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
       // Serialize a JsonDocument into a MQTT message
       docLightData["uid"] = _iotDeviceUId;
-      docLightData["status"] = _currentLightStatus_1;
       docLightData["operating_mode"] = _currentOperatingMode_1;
+      docLightData["status"] = _currentLightStatus_1;
       docLightData["visibility_bright"] = _visibilityBright;
       docLightData["visibility_dark"] = _visibilityDark;
       docLightData["visibility_dim"] = _visibilityDim;
@@ -791,7 +791,7 @@ void reconnectToMQTTBroker() {
       mqttClient.subscribe(HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA);
       mqttClient.subscribe(HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA);
 
-      mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(mqttClientUId, macId));
+      mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
     }
     else {
       Serial.print("Error MQTT connection. Trying to reconnect within 5 seconds.");
