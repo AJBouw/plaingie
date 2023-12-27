@@ -17,14 +17,15 @@ const char* WI_FI_SSID = WI_FI_SSID_CONF;
 const int MQTT_BROKER_TCP_PORT = MQTT_BROKER_TCP_PORT_CONF;
 const int MQTT_BROKER_WS_PORT = MQTT_BROKER_WS_PORT_CONF;
 
-const char* MQTT_CLIENT_UID_BASE = MQTT_CLIENT_UID_BASE_CONF;
 const char* MQTT_BROKER = MQTT_BROKER_CONF;
+const char* MQTT_CLIENT_UID_BASE = MQTT_CLIENT_UID_BASE_CONF;
 const char* MQTT_PASSWORD = MQTT_PASSWORD_CONF;
 const char* MQTT_USERNAME = MQTT_USERNAME_CONF;
 
 const uint16_t MQTT_MAX_PACKET_SIZE_OVERRIDE = 4096;
 
 const unsigned long MQTT_RECONNECT_EVENT_INTERVAL = MQTT_RECONNECT_EVENT_INTERVAL_CONF;
+const unsigned long MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL = MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL_CONF;
 #pragma endregion
 
 #pragma region | MQTT Topics
@@ -44,6 +45,7 @@ PubSubClient mqttClient(espWiFiClient);
 
 #pragma region | Auxiliary variables
 unsigned long lastReconnectToMqttBrokerAttempt = 0;
+unsigned long lastVerifyIsActiveAttempt = 0;
 unsigned long now = millis();
 unsigned long reconnectToMqttAttempt = 0;
 #pragma endregion
@@ -73,9 +75,6 @@ void setMicroControllerUnitUId(int uid) {
 }
 
 String ipId;
-/// @brief Get the Micro Controller Unit its current IP addrress.
-/// @return IP address represented by ipId (ip_id database attribute).
-
 /**
  * @brief Set IP Id object
  * The Micro Controller Unit's IP address is known as the attribute IP Id.
@@ -86,7 +85,6 @@ String getIPId() {
 }
 
 String macId;
-
 /**
  * @brief Set the MAC Id object
  * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
@@ -98,7 +96,6 @@ String getMACId() {
 
 char concatMQTTClientUId[50];
 char* mqttClientUId;
-
 /**
  * @brief Concatenate MQTT Client UId object
  * MQTT Client UId is a composition of the Micro Controller Unit's name and MAC Id.
@@ -121,7 +118,7 @@ bool microControllerUnitIsActivated = false;
  */
 Servo servo_1;
 
-int _iotDeviceUId = 4;
+int _iotDeviceUId = 8;
 /**
  * @brief Set the IoT Device UId object
  * 
@@ -147,7 +144,7 @@ void setGPIO(String gpio) {
   _gpio_servo_1 = gpio.toInt();
 }
 
-String _category = "servo";
+String _category;
 /**
  * @brief Set the Category object
  * The device's category can be light, light sensor, motion sensor, servo, and webcam.
@@ -157,7 +154,7 @@ void setCategory(String category) {
   _category = category;
 }
 
-String _identifier = "servo-1";
+String _identifier;
 /**
  * @brief Set the Identifier object
  * The identifier is the name of the device.
@@ -167,7 +164,7 @@ void setIdentifier(String identifier) {
   _identifier = identifier;
 }
 
-String _locationDescription = "backyard fence";
+String _locationDescription;
 /**
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
@@ -178,7 +175,7 @@ void setLocationDescription(String locationDescription) {
   _locationDescription = locationDescription;
 }
 
-String _locationLabel = "backyard";
+String _locationLabel;
 /**
  * @brief Set the Location Label object
  * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
@@ -203,6 +200,12 @@ bool iotDeviceIsVerified = false;
 
 #pragma region | Servo Data
 int _currentPosition_1 = 0;
+/**
+ * @brief Set the Current Position object
+ * 
+ * @param gpio 
+ * @param positionCommand 
+ */
 void setCurrentPosition(int gpio, int positionCommand) {
   if (gpio == gpio_servo_1) {
       servo_1.write(positionCommand);
@@ -213,6 +216,12 @@ void setCurrentPosition(int gpio, int positionCommand) {
 int previousPosition_1 = 0;
 
 int _startPosition_1 = 0;
+/**
+ * @brief Set the Start Position object
+ * 
+ * @param gpio 
+ * @param positionCommand 
+ */
 void setStartPosition(int gpio, int positionCommand) {
   if (gpio == gpio_servo_1) {
     _startPosition_1 = positionCommand;
@@ -253,12 +262,12 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
   docMicroControllerUnit.clear();
 
   // Serialize a JsonDocument into a MQTT message
-  docMicroControllerUnit["macId"] = macId;
-  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
+  docMicroControllerUnit["mac_id"] = macId;
+  docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
-  size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
+  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
@@ -379,7 +388,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     int microControllerUnitUId = 4;
-    int iotDeviceUId = 4;
+    int iotDeviceUId = 8;
     String category = "servo";
     String gpio = "4";
     String identifier = "servo-1";
@@ -555,5 +564,11 @@ void loop() {
   }
   
   mqttClient.loop();
+
+  now = millis();
+  if (((!microControllerUnitIsActivated && !iotDeviceIsVerified) || (microControllerUnitIsActivated && !iotDeviceIsVerified)) && ((now - lastVerifyIsActiveAttempt) > MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL)) {
+    lastVerifyIsActiveAttempt = now;
+    mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
+  }
 }
 #pragma endregion
