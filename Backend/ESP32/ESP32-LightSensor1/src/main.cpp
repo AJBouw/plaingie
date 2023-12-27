@@ -24,12 +24,13 @@ const uint16_t MQTT_MAX_PACKET_SIZE_OVERRIDE = 4096;
 
 const unsigned long LIGHT_EVENT_INTERVAL = LIGHT_EVENT_INTERVAL_CONF;
 const unsigned long MQTT_RECONNECT_EVENT_INTERVAL = MQTT_RECONNECT_EVENT_INTERVAL_CONF;
+const unsigned long MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL = MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL_CONF;
 #pragma endregion
 
 #pragma region | MQTT Topics
+const char* ACTIVATION_DISTRIBUTION = ACTIVATION_DISTRIBUTION_CONF;
 const char* ACTIVATION_REQUEST = ACTIVATION_REQUEST_CONF;
 const char* ACTIVATION_RESPONSE = ACTIVATION_RESPONSE_CONF;
-const char* ACTIVATION_DISTRIBUTION = ACTIVATION_DISTRIBUTION_CONF;
 
 const char* HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA = HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA_CONF;
 #pragma endregion
@@ -42,18 +43,17 @@ PubSubClient mqttClient(espWiFiClient);
 #pragma region | Auxiliary variables
 unsigned long lastMessageLightSensor_1 = 0;
 unsigned long lastReconnectToMqttBrokerAttempt = 0;
+unsigned long lastVerifyIsActiveAttempt = 0;
 unsigned long now = millis();
 unsigned long reconnectToMqttAttempt = 0;
 #pragma endregion
 
 #pragma region | JSON
 // Allocating JSON Document
-DynamicJsonDocument docLightSensor(256);
 DynamicJsonDocument docLightSensorData(256);
 DynamicJsonDocument docMessage(256);
 DynamicJsonDocument docMicroControllerUnit(256);
 
-char jsonLightSensor[256];
 char jsonLightSensorData[256];
 char jsonMessage[256];
 char jsonMicroControllerUnit[256];
@@ -71,9 +71,6 @@ void setMicroControllerUnitUId(int uid) {
 }
 
 String ipId;
-/// @brief Get the Micro Controller Unit its current IP addrress.
-/// @return IP address represented by ipId (ip_id database attribute).
-
 /**
  * @brief Set IP Id object
  * The Micro Controller Unit's IP address is known as the attribute IP Id.
@@ -127,13 +124,17 @@ void setIoTDeviceUId(int uid) {
  */
 int brightnessMinimumValue = 0; // Set by experiment
 int brightnessMaximumValue = 1023; // Set by experiment
-// int levelRangeMinimum = 0;
-// int levelRangeMaximum = 3;
 
 int _currentLightIntensity_1;
+/**
+ * @brief Get the Light Intensity object
+ * 
+ * @param gpio 
+ */
 void getLightIntensity(int gpio) {
   _currentLightIntensity_1 = analogRead(gpio);
 }
+
 /**
  * @brief The LDR (light sensor) has to be connected to ADC1 pin using WiFi
  * For ESP32 Wroom this is GPIO 32-36, 39
@@ -152,7 +153,7 @@ void setGPIO(String gpio) {
 
 int previousLightIntensity_1;
 
-String _category = "light sensor";
+String _category;
 /**
  * @brief Set the Category object
  * The device's category can be light, light sensor, motion sensor, servo, and webcam.
@@ -162,7 +163,7 @@ void setCategory(String category) {
   _category = category;
 }
 
-String _identifier = "light-sensor-1";
+String _identifier;
 /**
  * @brief Set the Identifier object
  * The identifier is the name of the device.
@@ -172,7 +173,7 @@ void setIdentifier(String identifier) {
   _identifier = identifier;
 }
 
-String _locationDescription = "backyard fence";
+String _locationDescription;
 /**
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
@@ -183,7 +184,7 @@ void setLocationDescription(String locationDescription) {
   _locationDescription = locationDescription;
 }
 
-String _locationLabel = "backyard";
+String _locationLabel;
 /**
  * @brief Set the Location Label object
  * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
@@ -239,12 +240,12 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
   docMicroControllerUnit.clear();
 
   // Serialize a JsonDocument into a MQTT message
-  docMicroControllerUnit["macId"] = macId;
-  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
+  docMicroControllerUnit["mac_id"] = macId;
+  docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
-  size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
+  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
@@ -270,7 +271,7 @@ char* getJSONLightSensorData(int iotDeviceUId, int lightIntensity) {
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
-  size_t n = serializeJson(docLightSensorData, jsonLightSensorData);
+  // size_t n = serializeJson(docLightSensorData, jsonLightSensorData);
   
   serializeJson(docLightSensorData, jsonLightSensorData);
   Serial.println("json light sensor " + String(jsonLightSensorData));
@@ -360,8 +361,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int microControllerUnitUId = 1;
-    int iotDeviceUId = 1;
+    int microControllerUnitUId = 2;
+    int iotDeviceUId = 2;
     String category = "light sensor";
     String gpio = "36";
     String identifier = "light-sensor-1";
@@ -456,6 +457,12 @@ void loop() {
   }
   
   mqttClient.loop();
+  
+  now = millis();
+  if (((!microControllerUnitIsActivated && !iotDeviceIsVerified) || (microControllerUnitIsActivated && !iotDeviceIsVerified)) && ((now - lastVerifyIsActiveAttempt) > MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL)) {
+    lastVerifyIsActiveAttempt = now;
+    mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
+  }
   
   getLightIntensity(gpio_light_sensor_1);
   now = millis();
