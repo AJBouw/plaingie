@@ -21,10 +21,11 @@ const char* MQTT_CLIENT_UID_BASE = MQTT_CLIENT_UID_BASE_CONF;
 const char* MQTT_PASSWORD = MQTT_PASSWORD_CONF;
 const char* MQTT_USERNAME = MQTT_USERNAME_CONF;
 
+const uint16_t MQTT_MAX_PACKET_SIZE_OVERRIDE = 4096;
+
 const unsigned long LIGHT_EVENT_INTERVAL = LIGHT_EVENT_INTERVAL_CONF;
 const unsigned long MQTT_RECONNECT_EVENT_INTERVAL = MQTT_RECONNECT_EVENT_INTERVAL_CONF;
-
-const uint16_t MQTT_MAX_PACKET_SIZE_OVERRIDE = 4096;
+const unsigned long MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL = MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL_CONF;
 #pragma endregion
 
 #pragma region | MQTT Topics
@@ -49,20 +50,20 @@ PubSubClient mqttClient(espWiFiClient);
 #pragma region | Auxiliary variables
 unsigned long now = millis();
 unsigned long lastReconnectToMqttBrokerAttempt = 0;
+unsigned long lastVerifyIsActiveAttempt = 0;
 unsigned long reconnectToMqttAttempt = 0;
 #pragma endregion
 
 #pragma region | JSON
 // Allocating JSON Document
-// DynamicJsonDocument docData(256);
 DynamicJsonDocument docLightData(256);
 DynamicJsonDocument docLightSensorData(256);
 DynamicJsonDocument docMessage(256);
 DynamicJsonDocument docMicroControllerUnit(256);
 DynamicJsonDocument docMotionSensorData(256);
 
-char jsonMessage[256];
 char jsonLightData[256];
+char jsonMessage[256];
 char jsonMicroControllerUnit[256];
 #pragma endregion
 
@@ -88,7 +89,6 @@ String getIPId() {
 }
 
 String macId;
-
 /**
  * @brief Set the MAC Id object
  * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
@@ -100,7 +100,6 @@ String getMACId() {
 
 char concatMQTTClientUId[50];
 char* mqttClientUId;
-
 /**
  * @brief Concatenate MQTT Client UId object
  * MQTT Client UId is a composition of the Micro Controller Unit's name and MAC Id.
@@ -128,7 +127,6 @@ void setIoTDeviceUId(int uid) {
 
 int gpio_light_1 = 4;
 int _gpio_light_1;
-
 /**
  * @brief Set the GPIO object
  * 
@@ -138,7 +136,7 @@ void setGPIO(String gpio) {
   _gpio_light_1 = gpio.toInt();
 }
 
-String _category = "light";
+String _category;
 /**
  * @brief Set the Category object
  * The device's category can be light, light sensor, motion sensor, servo, and webcam.
@@ -148,7 +146,7 @@ void setCategory(String category) {
   _category = category;
 }
 
-String _identifier = "light-1";
+String _identifier;
 /**
  * @brief Set the Identifier object
  * The identifier is the name of the device.
@@ -158,7 +156,7 @@ void setIdentifier(String identifier) {
   _identifier = identifier;
 }
 
-String _locationDescription = "backyard fence";
+String _locationDescription;
 /**
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
@@ -169,7 +167,7 @@ void setLocationDescription(String locationDescription) {
   _locationDescription = locationDescription;
 }
 
-String _locationLabel = "backyard";
+String _locationLabel;
 /**
  * @brief Set the Location Label object
  * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
@@ -244,19 +242,20 @@ int lightIntensity_1;
 #pragma endregion
 
 #pragma region | Motion Sensor Data
-bool motionIsDetected_1;
-bool motionIsDetected_2;
+bool motionIsDetected_1 = false;
+bool motionIsDetected_2 = false;
 #pragma endregion
 
 /**
  * @brief Set the Device object
  * 
  * @param uid 
- * @param identifier 
- * @param gpio 
  * @param category 
- * @param locationLabel 
+ * @param gpio 
+ * @param identifier
  * @param isActive 
+ * @param locationDescription
+ * @param locationLabel 
  */
 void setDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
   _iotDeviceUId = uid;
@@ -289,7 +288,7 @@ void setLightData(int status, String operatingMode, int visibilityBright, int vi
  * @brief Set the Light Status object
  * 
  * @param gpio 
- * @param lightStatus 
+ * @param lightCommand 
  * @return int Value 1, turn the light on, and
  * value 2, turn the light off.
  */
@@ -306,6 +305,12 @@ void setLightStatusByApp(int gpio, int lightCommand) {
   }
 }
 
+/**
+ * @brief Set the light status object by light intensity
+ * 
+ * @param gpio 
+ * @param lightIntensity 
+ */
 void setLightStatusByLightIntensity(int gpio, int lightIntensity) {
   Serial.println("_visibilityDark " + _visibilityDark);
   Serial.println("_visiblityDim" + _visibilityDim);
@@ -332,6 +337,12 @@ void setLightStatusByLightIntensity(int gpio, int lightIntensity) {
   }
 }
 
+/**
+ * @brief Set the light status object by motion
+ * 
+ * @param gpio 
+ * @param motionIsDetected 
+ */
 void setLightStatusByMotion(int gpio, bool motionIsDetected) {
   if ((motionIsDetected == 1) && (lightIntensity_1 <= _visibilityDim) && (previousLightStatus_1 != 1)) {
     digitalWrite(gpio, HIGH);
@@ -355,12 +366,12 @@ char* getJSONActivationRequest( String macId, String mqttClientUId) {
   docMicroControllerUnit.clear();
 
   // Serialize a JsonDocument into a MQTT message
-  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
-  docMicroControllerUnit["macId"] = macId;
+  docMicroControllerUnit["mac_id"] = macId;
+  docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
-  size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
+  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
@@ -831,7 +842,13 @@ void loop() {
   if (!mqttClient.connected()) {
     reconnectToMQTTBroker();
   }
-  
+
+  now = millis();
+  if (((!microControllerUnitIsActivated && !iotDeviceIsVerified) || (microControllerUnitIsActivated && !iotDeviceIsVerified)) && ((now - lastVerifyIsActiveAttempt) > MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL)) {
+    lastVerifyIsActiveAttempt = now;
+    mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
+  }
+
   mqttClient.loop();
 }
 #pragma endregion
