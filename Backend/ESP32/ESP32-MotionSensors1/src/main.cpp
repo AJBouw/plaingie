@@ -25,6 +25,7 @@ const uint16_t MQTT_MAX_PACKET_SIZE_OVERRIDE = 4096;
 const unsigned long CALIBRATION_EVENT_INTERVAL = CALIBRATION_EVENT_INTERVAL_CONF;
 const unsigned long MOTION_EVENT_INTERVAL = MOTION_EVENT_INTERVAL_CONF;
 const unsigned long MQTT_RECONNECT_EVENT_INTERVAL = MQTT_RECONNECT_EVENT_INTERVAL_CONF;
+const unsigned long MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL = MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL_CONF;
 #pragma endregion
 
 #pragma region | MQTT Topics
@@ -43,6 +44,7 @@ PubSubClient mqttClient(espWiFiClient);
 #pragma region | Auxiliary variables
 unsigned long lastMessageMotionSensor_1 = 0;
 unsigned long lastReconnectToMqttBrokerAttempt = 0;
+unsigned long lastVerifyIsActiveAttempt = 0;
 unsigned long now = millis();
 unsigned long reconnectToMqttAttempt = 0;
 #pragma endregion
@@ -62,6 +64,7 @@ char jsonMicroControllerUnit[256];
 
 #pragma region | Micro Controller Unit
 int _microControllerUnitUId = 3;
+
 /**
  * @brief Set the Micro Controller Unit UId object
  * 
@@ -133,7 +136,7 @@ void setGPIO(String gpio) {
   _gpio_motion_sensor_1 = gpio.toInt();
 }
 
-String _category = "motion sensor";
+String _category;
 /**
  * @brief Set the Category object
  * The IoT device's category can be light, light sensor, motion sensor, servo, and webcam.
@@ -143,7 +146,7 @@ void setCategory(String category) {
   _category = category;
 }
 
-String _identifier = "motion-sensor-1";
+String _identifier;
 /**
  * @brief Set the Identifier object
  * The identifier is the name of the IoT device.
@@ -153,7 +156,7 @@ void setIdentifier(String identifier) {
   _identifier = identifier;
 }
 
-String _locationDescription = "backyard fence";
+String _locationDescription;
 /**
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
@@ -164,7 +167,7 @@ void setLocationDescription(String locationDescription) {
   _locationDescription = locationDescription;
 }
 
-String _locationLabel = "backyard";
+String _locationLabel;
 /**
  * @brief Set the Location Label object
  * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
@@ -228,12 +231,12 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
   docMicroControllerUnit.clear();
 
   // Serialize a JsonDocument into a MQTT message
-  docMicroControllerUnit["macId"] = macId;
-  docMicroControllerUnit["mqttClientUId"] = mqttClientUId;
+  docMicroControllerUnit["mac_id"] = macId;
+  docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
-  size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
+  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
@@ -258,20 +261,11 @@ char* getJSONMotionSensorData(int iotDeviceUId, bool motionIsDetected) {
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
-  size_t n = serializeJson(docMotionSensorData, jsonMotionSensorData);
+  // size_t n = serializeJson(docMotionSensorData, jsonMotionSensorData);
   
   serializeJson(docMotionSensorData, jsonMotionSensorData);
   Serial.println("json motion sensor " + String(jsonMotionSensorData));
   return jsonMotionSensorData;
-}
-
-/**
- * @brief Act as Interrupt Service Routine (ISR)
- * Whenever the PIR/motion sensor is detecting movement, the function will be called.
- */
-void IRAM_ATTR detectMotionSensor1() {
-    motionIsDetectedSensor_1 = true;
-    lastMessageMotionSensor_1 = millis();
 }
 
 /**
@@ -327,11 +321,47 @@ void callback(char* topic, byte* payload, unsigned int length) {
   iotDeviceIsVerified = true;
 
   if (!microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_REQUEST)) {
-    // Handle activation response
-    microControllerUnitIsActivated = true;
+    // Clear JsonDocument
+    docMicroControllerUnit.clear();
+
+    // Cast payload to pointer-to-const to disable ArduinoJson's zero-copy mode
+    DeserializationError deserializationError = deserializeJson(docMicroControllerUnit, (const byte*)payload);
+
+    // If deserialization operation was not successful (Ok).
+    if (deserializationError) {
+      Serial.print(deserializationError.c_str());
+    }
+
+    int uid = 2;
+    int status_code = 200;
+    String information = "2";
+    String message = "OK";
+
+    if ((uid = _microControllerUnitUId) && (status_code == 200)) {
+      microControllerUnitIsActivated = true;
+    }
   }
   else if (microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_DISTRIBUTION)) {
-    // Handle distribution
+    // Clear JsonDocument
+    docMessage.clear();
+
+    // Cast payload to pointer-to-const to disable ArduinoJson's zero-copy mode
+    DeserializationError deserializationError = deserializeJson(docMessage, (const byte*)payload);
+
+    // If deserialization operation was not successful (Ok).
+    if (deserializationError) {
+      Serial.print(deserializationError.c_str());
+    }
+
+    int microControllerUnitUId = 3;
+    int iotDeviceUId = 3;
+    String category = "motion sensor";
+    String gpio = "2";
+    String identifier = "motion-sensor-1";
+    bool isActive = true;
+    String locationDescription = "backyard fence";
+    String locationLabel = "backyard";
+    
     iotDeviceIsVerified = true;
   }
 }
@@ -364,8 +394,8 @@ void reconnectToMQTTBroker() {
   now = millis();
 
   while ((!mqttClient.connected()) && ((now - lastReconnectToMqttBrokerAttempt)  > MQTT_RECONNECT_EVENT_INTERVAL)) {
-    // microControllerUnitIsActivated = false;
-    // iotDeviceIsVerified = false;
+    microControllerUnitIsActivated = false;
+    iotDeviceIsVerified = false;
 
     lastReconnectToMqttBrokerAttempt = now;
     reconnectToMqttAttempt++;
@@ -397,14 +427,10 @@ void setup() {
   
   delay(CALIBRATION_EVENT_INTERVAL);
   pinMode(gpio_motion_sensor_1, INPUT);
-  // pinMode(gpio_motion_sensor_1, INPUT_PULLUP);
-  // attachInterrupt(digitalPinToInterrupt(gpio_motion_sensor_1), detectMotionSensor1, RISING);
   Serial.println("MOTION_SENSOR_1 attached");
 
   connectToWiFi();
-  connectToMQTTBroker();
-
-  
+  connectToMQTTBroker();  
 }
 #pragma endregion
 
@@ -425,12 +451,16 @@ void loop() {
   }
   
   mqttClient.loop();
-  
+
   now = millis();
-  iotDeviceIsVerified = true;
+  if (((!microControllerUnitIsActivated && !iotDeviceIsVerified) || (microControllerUnitIsActivated && !iotDeviceIsVerified)) && ((now - lastVerifyIsActiveAttempt) > MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL)) {
+    lastVerifyIsActiveAttempt = now;
+    mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
+  }
   
   getMotionSensor_1(gpio_motion_sensor_1);
-  
+  now = millis();
+  iotDeviceIsVerified = true;
   if (iotDeviceIsVerified && _motionIsDetectedSensor_1 && !motionWasDetectedSensor_1) {
     Serial.println("getmototionsensor1 " + String(_motionIsDetectedSensor_1));
   
