@@ -51,20 +51,17 @@ unsigned long reconnectToMqttAttempt = 0;
 
 #pragma region | JSON
 // Allocating JSON Document
-DynamicJsonDocument docMessage(256);
-DynamicJsonDocument docMotionSensor(256);
+DynamicJsonDocument docMessage(768);
 DynamicJsonDocument docMotionSensorData(256);
 DynamicJsonDocument docMicroControllerUnit(256);
 
 char jsonMessage[256];
-char jsonMotionSensor[256];
 char jsonMotionSensorData[356];
 char jsonMicroControllerUnit[256];
 #pragma endregion
 
 #pragma region | Micro Controller Unit
 int _microControllerUnitUId = 3;
-
 /**
  * @brief Set the Micro Controller Unit UId object
  * 
@@ -96,7 +93,6 @@ String getMACId() {
 
 char concatMQTTClientUId[50];
 char* mqttClientUId;
-
 /**
  * @brief Concatenate MQTT Client UId object
  * MQTT Client UId is a composition of the Micro Controller Unit's name and MAC Id.
@@ -112,7 +108,7 @@ bool microControllerUnitIsActivated = false;
 #pragma endregion
 
 #pragma region | Device : Motion Sensor
-int _iotDeviceUId = 3;
+int _iotDeviceUId;
 
 /**
  * @brief Set the IoTDevice UId object
@@ -209,7 +205,7 @@ bool motionWasDetectedSensor_1;
  * @param locationDescription
  * @param locationLabel
  */
-void setDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
+void setIoTDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
   _iotDeviceUId = uid;
   _category = category;
   _gpio_motion_sensor_1 = gpio.toInt();
@@ -332,12 +328,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int uid = 2;
-    int status_code = 200;
-    String information = "2";
-    String message = "OK";
+    // Extracting values from JsonDocument
+    String information = docMicroControllerUnit["information"];
+    String message = docMicroControllerUnit["message"];
+    int statusCode = docMicroControllerUnit["status_code"];
+    int uid = docMicroControllerUnit["uid"];
 
-    if ((uid = _microControllerUnitUId) && (status_code == 200)) {
+    if ((uid = _microControllerUnitUId) && (statusCode == 200)) {
       microControllerUnitIsActivated = true;
     }
   }
@@ -352,17 +349,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (deserializationError) {
       Serial.print(deserializationError.c_str());
     }
-
-    int microControllerUnitUId = 3;
-    int iotDeviceUId = 3;
-    String category = "motion sensor";
-    String gpio = "2";
-    String identifier = "motion-sensor-1";
-    bool isActive = true;
-    String locationDescription = "backyard fence";
-    String locationLabel = "backyard";
+    int iotDeviceUId = docMessage["uid"];
+    String category = docMessage["category"];
+    String gpio = docMessage["gpio"];
+    String identifier = docMessage["identifier"];
+    bool isActive = docMessage["is_active"];
+    String locationDescription = docMessage["location_description"];
+    String locationLabel = docMessage["location_label"];
+    int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
     
-    iotDeviceIsVerified = true;
+
+    if (microControllerUnitUId == _microControllerUnitUId) {
+      setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
+    
+      iotDeviceIsVerified = true;
+    }
   }
 }
 
