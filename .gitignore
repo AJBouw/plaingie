@@ -1,1 +1,16 @@
-/.idea/
+.DS_Store
+*PlaingieConf.h
+
+Backend/ESP32/ESP32-Light1/.idea/
+Backend/ESP32/ESP32-Light1/.vscode/
+Backend/ESP32/ESP32-Light1/.pio/
+Backend/ESP32/ESP32-LightSensor1/.idea/
+Backend/ESP32/ESP32-LightSensor1/.pio/
+Backend/ESP32/ESP32-LightSensor1/.vscode/
+Backend/ESP32/ESP32-MotionSensors1/.idea/
+Backend/ESP32/ESP32-MotionSensors1/.pio/
+Backend/ESP32/ESP32-MotionSensors1/.vscode/
+Backend/ESP32/ESP32-Servo1/.idea/
+Backend/ESP32/ESP32-Servo1/.pio/
+Backend/ESP32/ESP32-Servo1/.vscode/
+
