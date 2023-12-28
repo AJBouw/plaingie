@@ -214,7 +214,7 @@ void setCurrentPosition(int gpio, int positionCommand) {
 
 int previousPosition_1 = 0;
 
-int _startPosition_1 = 0;
+int _startPosition_1;
 /**
  * @brief Set the Start Position object
  * 
@@ -275,14 +275,13 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
 }
 
 /**
- * @brief Create JSON Light Sensor Data object
+ * @brief Create JSON Servo Data object
  * 
- * @param gpio 
  * @param iotDeviceUId 
- * @param lightIntensity 
+ * @param currentPosition
+ * @param startPosition 
  * @return char* 
  */
-
 char* getJSONServoData(int iotDeviceUId, int currentPosition, int startPosition) {
   // Clear JsonDocument
   docServoData.clear();
@@ -294,7 +293,7 @@ char* getJSONServoData(int iotDeviceUId, int currentPosition, int startPosition)
 
   // TODO: verify if this is okay or use size_t n
   // Save a few CPU cycles by passing the size of the payload
-  size_t n = serializeJson(docServoData, jsonServoData);
+  // size_t n = serializeJson(docServoData, jsonServoData);
   
   serializeJson(docServoData, jsonServoData);
   Serial.println("json servo sensor " + String(jsonServoData));
@@ -349,9 +348,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
     messageTemp += (char)payload[i];
   }
+
   Serial.println();
 
-  if (!microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_REQUEST)) {
+  
+  Serial.println("microControllerUnitIsActivated");
+  Serial.println(microControllerUnitIsActivated);
+  Serial.println("iotDeviceIsVerified");
+  Serial.println(iotDeviceIsVerified);
+  if (!microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_RESPONSE)) {
     // Clear JsonDocument
     docMicroControllerUnit.clear();
 
@@ -369,6 +374,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
     int statusCode = docMicroControllerUnit["status_code"];
     int uid = docMicroControllerUnit["uid"];
 
+    Serial.println("uid");
+    Serial.println(uid);
+    Serial.println("mcu uid ");
+    Serial.println(_microControllerUnitUId);
+    Serial.println(statusCode);
     if ((uid = _microControllerUnitUId) && (statusCode == 200)) {
       microControllerUnitIsActivated = true;
     }
@@ -385,6 +395,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
+    Serial.println("extract distribution data");
+
     int iotDeviceUId = docMessage["uid"];
     String category = docMessage["category"];
     String gpio = docMessage["gpio"];
@@ -395,12 +407,20 @@ void callback(char* topic, byte* payload, unsigned int length) {
     int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
 
     int startPosition = docMessage["start_position"];
+
+    Serial.println("mcu UId");
+    Serial.println(microControllerUnitUId);
+    Serial.println("_mcuUId");
+    Serial.println(_microControllerUnitUId);
     if (microControllerUnitUId == _microControllerUnitUId) {
       setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
       setStartPosition(_gpio_servo_1, startPosition);
       
       iotDeviceIsVerified = true;
     }
+
+    Serial.println("is verfied?");
+    Serial.println(iotDeviceIsVerified);
   }
   else if (microControllerUnitIsActivated && iotDeviceIsVerified) {
     if (String(topic) == HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION) {
@@ -571,6 +591,10 @@ void loop() {
 
   now = millis();
   if (((!microControllerUnitIsActivated && !iotDeviceIsVerified) || (microControllerUnitIsActivated && !iotDeviceIsVerified)) && ((now - lastVerifyIsActiveAttempt) > MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL)) {
+    Serial.println("iot");
+    Serial.println(iotDeviceIsVerified);
+    Serial.println("mcu active");
+    Serial.println(microControllerUnitIsActivated);
     lastVerifyIsActiveAttempt = now;
     mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
   }
