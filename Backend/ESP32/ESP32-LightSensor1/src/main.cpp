@@ -51,7 +51,7 @@ unsigned long reconnectToMqttAttempt = 0;
 #pragma region | JSON
 // Allocating JSON Document
 DynamicJsonDocument docLightSensorData(256);
-DynamicJsonDocument docMessage(256);
+DynamicJsonDocument docMessage(768);
 DynamicJsonDocument docMicroControllerUnit(256);
 
 char jsonLightSensorData[256];
@@ -107,7 +107,7 @@ bool microControllerUnitIsActivated = false;
 #pragma endregion
 
 #pragma region | IoT Device : Light Sensor
-int _iotDeviceUId = 2;
+int _iotDeviceUId;
 /**
  * @brief Set the IoT device UId object
  * 
@@ -218,7 +218,7 @@ bool iotDeviceIsVerified = false;
  * @param locationDescription
  * @param locationLabel
  */
-void setIoTDevice(int uid, String gpio, String identifier, bool isActive, String category, String locationDescription, String locationLabel) {
+void setIoTDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
   _iotDeviceUId = uid;
   _category = category;
   _gpio_light_sensor_1 = gpio.toInt();
@@ -256,7 +256,6 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
 /**
  * @brief Create JSON Light Sensor Data object
  * 
- * @param gpio 
  * @param iotDeviceUId 
  * @param lightIntensity 
  * @return char* 
@@ -340,12 +339,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int uid = 2;
-    int status_code = 200;
-    String information = "2";
-    String message = "OK";
+    // Extracting values from JsonDocument
+    String information = docMicroControllerUnit["information"];
+    String message = docMicroControllerUnit["message"];
+    int statusCode = docMicroControllerUnit["status_code"];
+    int uid = docMicroControllerUnit["uid"];
 
-    if ((uid = _microControllerUnitUId) && (status_code == 200)) {
+    if ((uid = _microControllerUnitUId) && (statusCode == 200)) {
       microControllerUnitIsActivated = true;
     }
   }
@@ -361,16 +361,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int microControllerUnitUId = 2;
-    int iotDeviceUId = 2;
-    String category = "light sensor";
-    String gpio = "36";
-    String identifier = "light-sensor-1";
-    bool isActive = true;
-    String locationDescription = "backyard fence";
-    String locationLabel = "backyard";
+    int iotDeviceUId = docMessage["uid"];
+    String category = docMessage["category"];
+    String gpio = docMessage["gpio"];
+    String identifier = docMessage["identifier"];
+    bool isActive = docMessage["is_active"];
+    String locationDescription = docMessage["location_description"];
+    String locationLabel = docMessage["location_label"];
+    int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
     
-    iotDeviceIsVerified = true;
+    if (microControllerUnitUId == _microControllerUnitUId) {
+      setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
+      iotDeviceIsVerified = true;
+    }
   }
 }
 
