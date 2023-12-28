@@ -115,7 +115,7 @@ bool microControllerUnitIsActivated = false;
 #pragma endregion
 
 #pragma region | IoT Device: Light
-int _iotDeviceUId = 1;
+int _iotDeviceUId;
 /**
  * @brief Set the IoT Device UId object
  * 
@@ -478,20 +478,22 @@ void callback(char* topic, byte* payload, unsigned int length) {
     int visibilityDark = docMessage["visbility_dark"];
     int visibilityDim = docMessage["visibility_dim"];
 
-    setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
-    setVisibility(visibilityBright, visibilityDark, visibilityDim);
+    if (microControllerUnitUId == _microControllerUnitUId) {
+      setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
+      setVisibility(visibilityBright, visibilityDark, visibilityDim);
 
-    if (operatingMode == "manual") {
-      setLightStatusByApp(_gpio_light_1, status);
-    }
-    else if (operatingMode == "brightness") {
-      setLightStatusByLightIntensity(_gpio_light_1, lightIntensity_1);
-    }
-    else if (operatingMode == "motion") {
-      setLightStatusByMotion(gpio_light_1, motionIsDetected_1);
-    }
+      if (operatingMode == "manual") {
+        setLightStatusByApp(_gpio_light_1, status);
+      }
+      else if (operatingMode == "brightness") {
+        setLightStatusByLightIntensity(_gpio_light_1, lightIntensity_1);
+      }
+      else if (operatingMode == "motion") {
+        setLightStatusByMotion(gpio_light_1, motionIsDetected_1);
+      }
 
-    iotDeviceIsVerified = true;
+      iotDeviceIsVerified = true;
+    }
   }
   else if (microControllerUnitIsActivated && iotDeviceIsVerified) {
     if (String(topic) == HOME_BACKYARD_LIGHT_1_COMMAND_LIGHT_SWITCH) {
