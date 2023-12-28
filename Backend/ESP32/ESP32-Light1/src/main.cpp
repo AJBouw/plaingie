@@ -257,7 +257,7 @@ bool motionIsDetected_2 = false;
  * @param locationDescription
  * @param locationLabel 
  */
-void setDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
+void setIoTDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
   _iotDeviceUId = uid;
   _category = category;
   _gpio_light_1 = gpio.toInt();
@@ -442,12 +442,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     // Extracting values from JsonDocument
-    int status_code = docMicroControllerUnit["status_code"];
-    int uid = docMicroControllerUnit["uid"];
     String information = docMicroControllerUnit["information"];
     String message = docMicroControllerUnit["message"];
+    int statusCode = docMicroControllerUnit["status_code"];
+    int uid = docMicroControllerUnit["uid"];
 
-    if ((uid = _microControllerUnitUId) && (status_code == 200)) {
+    if ((uid = _microControllerUnitUId) && (statusCode == 200)) {
       microControllerUnitIsActivated = true;
     }
   }
@@ -478,7 +478,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     int visibilityDark = docMessage["visbility_dark"];
     int visibilityDim = docMessage["visibility_dim"];
 
-    setDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
+    setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
     setVisibility(visibilityBright, visibilityDark, visibilityDim);
 
     if (operatingMode == "manual") {
