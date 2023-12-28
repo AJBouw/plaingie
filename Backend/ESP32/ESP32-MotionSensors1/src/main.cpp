@@ -313,8 +313,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
     messageTemp += (char)payload[i];
   }
   Serial.println();
-  microControllerUnitIsActivated = true;
-  iotDeviceIsVerified = true;
 
   if (!microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_REQUEST)) {
     // Clear JsonDocument
