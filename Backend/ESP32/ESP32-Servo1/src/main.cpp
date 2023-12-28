@@ -52,13 +52,12 @@ unsigned long reconnectToMqttAttempt = 0;
 
 #pragma region | JSON
 // Allocating JSON Document
-DynamicJsonDocument docMessage(256);
+DynamicJsonDocument docMessage(768);
 DynamicJsonDocument docServo(256);
 DynamicJsonDocument docServoData(256);
 DynamicJsonDocument docMicroControllerUnit(256);
 
 char jsonMessage[256];
-char jsonServo[256];
 char jsonServoData[256];
 char jsonMicroControllerUnit[256];
 #pragma endregion
@@ -118,7 +117,7 @@ bool microControllerUnitIsActivated = false;
  */
 Servo servo_1;
 
-int _iotDeviceUId = 8;
+int _iotDeviceUId;
 /**
  * @brief Set the IoT Device UId object
  * 
@@ -240,7 +239,7 @@ void setStartPosition(int gpio, int positionCommand) {
  * @param locationDescription
  * @param locationLabel  
  */
-void setDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
+void setIoTDevice(int uid, String category, String gpio, String identifier, bool isActive, String locationDescription, String locationLabel) {
   _iotDeviceUId = uid;
   _category = category;
   _gpio_servo_1 = gpio.toInt();
@@ -351,8 +350,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
     messageTemp += (char)payload[i];
   }
   Serial.println();
-  microControllerUnitIsActivated = true;
-  iotDeviceIsVerified = true;
 
   if (!microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_REQUEST)) {
     // Clear JsonDocument
@@ -366,12 +363,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int uid = 4;
-    int status_code = 200;
-    String information = "1";
-    String message = "OK";
+    // Extracting values from JsonDocument
+    String information = docMicroControllerUnit["information"];
+    String message = docMicroControllerUnit["message"];
+    int statusCode = docMicroControllerUnit["status_code"];
+    int uid = docMicroControllerUnit["uid"];
 
-    if ((uid = _microControllerUnitUId) && (status_code == 200)) {
+    if ((uid = _microControllerUnitUId) && (statusCode == 200)) {
       microControllerUnitIsActivated = true;
     }
   }
@@ -387,16 +385,22 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int microControllerUnitUId = 4;
-    int iotDeviceUId = 8;
-    String category = "servo";
-    String gpio = "4";
-    String identifier = "servo-1";
-    bool isActive = true;
-    String locationDescription = "backyard fence";
-    String locationLabel = "backyard";
+    int iotDeviceUId = docMessage["uid"];
+    String category = docMessage["category"];
+    String gpio = docMessage["gpio"];
+    String identifier = docMessage["identifier"];
+    bool isActive = docMessage["is_active"];
+    String locationDescription = docMessage["location_description"];
+    String locationLabel = docMessage["location_label"];
+    int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
 
-    iotDeviceIsVerified = true;
+    int startPosition = docMessage["start_position"];
+    if (microControllerUnitUId == _microControllerUnitUId) {
+      setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
+      setStartPosition(_gpio_servo_1, startPosition);
+      
+      iotDeviceIsVerified = true;
+    }
   }
   else if (microControllerUnitIsActivated && iotDeviceIsVerified) {
     if (String(topic) == HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION) {
