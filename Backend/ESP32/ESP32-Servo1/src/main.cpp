@@ -77,6 +77,7 @@ String ipId;
 /**
  * @brief Set IP Id object
  * The Micro Controller Unit's IP address is known as the attribute IP Id.
+ * 
  * @return String IP Id
  */
 String getIPId() {
@@ -87,6 +88,7 @@ String macId;
 /**
  * @brief Set the MAC Id object
  * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
+ * 
  * @return String MAC Id
  */
 String getMACId() {
@@ -132,8 +134,7 @@ void setIoTDeviceUId(int uid) {
  * Though, it is recommended by experience to use the following pins
  * 2, 4, 12-19, 21-23, 25-27, 32-33
  */
-int gpio_servo_1 = 4;
-int _gpio_servo_1;
+int _gpio_servo_1 = 4;
 /**
  * @brief Set the GPIO object
  * 
@@ -147,6 +148,7 @@ String _category;
 /**
  * @brief Set the Category object
  * The device's category can be light, light sensor, motion sensor, servo, and webcam.
+ * 
  * @param category 
  */
 void setCategory(String category) {
@@ -157,6 +159,7 @@ String _identifier;
 /**
  * @brief Set the Identifier object
  * The identifier is the name of the device.
+ * 
  * @param identifier 
  */
 void setIdentifier(String identifier) {
@@ -168,6 +171,7 @@ String _locationDescription;
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
  * device's location.
+ * 
  * @param locationDescription 
  */
 void setLocationDescription(String locationDescription) {
@@ -177,7 +181,10 @@ void setLocationDescription(String locationDescription) {
 String _locationLabel;
 /**
  * @brief Set the Location Label object
- * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
+ * Initially. the location label will be backyard.
+ * In future the location label can also be for example
+ * attic, backyard, bedroom, front yard, kitchen, living room.
+ * 
  * @param locationLabel 
  */
 void setLocationLabel(String locationLabel) {
@@ -188,6 +195,7 @@ bool _isActive;
 /**
  * @brief Set the IoT Device State object
  * The IoT device can be active or inactive.
+ * 
  * @param isActive 
  */
 void setIoTDeviceState(bool isActive) {
@@ -198,7 +206,7 @@ bool iotDeviceIsVerified = false;
 #pragma endregion
 
 #pragma region | Servo Data
-int _currentPosition_1 = 0;
+int _currentPosition_1;
 /**
  * @brief Set the Current Position object
  * 
@@ -206,7 +214,7 @@ int _currentPosition_1 = 0;
  * @param positionCommand 
  */
 void setCurrentPosition(int gpio, int positionCommand) {
-  if (gpio == gpio_servo_1) {
+  if (gpio == _gpio_servo_1) {
       servo_1.write(positionCommand);
     _currentPosition_1 = positionCommand;
   }
@@ -222,14 +230,14 @@ int _startPosition_1;
  * @param positionCommand 
  */
 void setStartPosition(int gpio, int positionCommand) {
-  if (gpio == gpio_servo_1) {
+  if (gpio == _gpio_servo_1) {
     _startPosition_1 = positionCommand;
   }
 }
 #pragma endregion
 
 /**
- * @brief Set the Device object
+ * @brief Set the IoT Device object
  * 
  * @param uid 
  * @param category 
@@ -264,11 +272,7 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
   docMicroControllerUnit["mac_id"] = macId;
   docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
-  // TODO: verify if this is okay or use size_t n
-  // Save a few CPU cycles by passing the size of the payload
-  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
-  
-  // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
+  // Produce a minified JSON document
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   return jsonMicroControllerUnit;
@@ -290,11 +294,8 @@ char* getJSONServoData(int iotDeviceUId, int currentPosition, int startPosition)
   docServoData["iot_device_uid"] = iotDeviceUId;
   docServoData["current_position"] = currentPosition;
   docServoData["start_position"] = startPosition;
-
-  // TODO: verify if this is okay or use size_t n
-  // Save a few CPU cycles by passing the size of the payload
-  // size_t n = serializeJson(docServoData, jsonServoData);
   
+  // Produce a minified JSON document
   serializeJson(docServoData, jsonServoData);
   Serial.println("json servo sensor " + String(jsonServoData));
   return jsonServoData;
@@ -351,7 +352,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   Serial.println();
 
-  
   Serial.println("microControllerUnitIsActivated");
   Serial.println(microControllerUnitIsActivated);
   Serial.println("iotDeviceIsVerified");
@@ -374,16 +374,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
     int statusCode = docMicroControllerUnit["status_code"];
     int uid = docMicroControllerUnit["uid"];
 
-    Serial.println("uid");
+    Serial.println("start activate");
     Serial.println(uid);
-    Serial.println("mcu uid ");
     Serial.println(_microControllerUnitUId);
     Serial.println(statusCode);
+
     if ((uid = _microControllerUnitUId) && (statusCode == 200)) {
       microControllerUnitIsActivated = true;
     }
   }
   else if (microControllerUnitIsActivated && !iotDeviceIsVerified && (String(topic) == ACTIVATION_DISTRIBUTION)) {
+    
     // Clear JsonDocument
     docMessage.clear();
 
@@ -395,29 +396,27 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    Serial.println("extract distribution data");
-
-    int iotDeviceUId = docMessage["uid"];
-    String category = docMessage["category"];
-    String gpio = docMessage["gpio"];
-    String identifier = docMessage["identifier"];
-    bool isActive = docMessage["is_active"];
-    String locationDescription = docMessage["location_description"];
-    String locationLabel = docMessage["location_label"];
-    int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
+    int iotDeviceUId = docMessage[0]["uid"];
+    String category = docMessage[0]["category"];
+    String gpio = docMessage[0]["gpio"];
+    String identifier = docMessage[0]["identifier"];
+    bool isActive = docMessage[0]["is_active"];
+    String locationDescription = docMessage[0]["location_description"];
+    String locationLabel = docMessage[0]["location_label"];
+    int microControllerUnitUId = docMessage[0]["micro_controller_unit_uid"];
 
     int startPosition = docMessage["start_position"];
-
+    
     Serial.println("mcu UId");
     Serial.println(microControllerUnitUId);
     Serial.println("_mcuUId");
     Serial.println(_microControllerUnitUId);
-    if (microControllerUnitUId == _microControllerUnitUId) {
+
+    // if (microControllerUnitUId == _microControllerUnitUId) {
       setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
       setStartPosition(_gpio_servo_1, startPosition);
-      
       iotDeviceIsVerified = true;
-    }
+    // }
 
     Serial.println("is verfied?");
     Serial.println(iotDeviceIsVerified);
@@ -442,7 +441,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.println(currentPosition);
 
       if ((iotDeviceUId == _iotDeviceUId) && currentPosition != _currentPosition_1) {
-        setCurrentPosition(gpio_servo_1, currentPosition);
+        setCurrentPosition(_gpio_servo_1, currentPosition);
 
         // Clear JsonDocument
         docServoData.clear();
@@ -453,6 +452,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         docServoData["start_position"] = _startPosition_1;
 
         // Save a few CPU cycles by passing the size of the payload
+        // Produce a minified JSON document
         size_t n = serializeJson(docServoData, jsonServoData);
 
         mqttClient.publish(HOME_BACKYARD_SERVO_1_SERVO_DATA, jsonServoData, n);
@@ -478,7 +478,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.println(startPosition);
 
       if ((iotDeviceUId == _iotDeviceUId) && startPosition != _startPosition_1) {
-        setStartPosition(gpio_servo_1, startPosition);
+        setStartPosition(_gpio_servo_1, startPosition);
 
         // Clear JsonDocument
         docServoData.clear();
@@ -489,6 +489,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         docServoData["start_position"] = _startPosition_1;
 
         // Save a few CPU cycles by passing the size of the payload
+        // Produce a minified JSON document
         size_t n = serializeJson(docServoData, jsonServoData);
 
         mqttClient.publish(HOME_BACKYARD_SERVO_1_SERVO_DATA, jsonServoData, n);
@@ -559,7 +560,7 @@ void setup() {
   Serial.begin(115200);
   
   servo_1.setPeriodHertz(50); // Standard 50hz
-  servo_1.attach(gpio_servo_1, 1000, 2000);
+  servo_1.attach(_gpio_servo_1, 1000, 2000);
 
   connectToWiFi();
   connectToMQTTBroker();
@@ -575,7 +576,7 @@ void setup() {
 void loop() {
   if (!servo_1.attached()) {
     servo_1.setPeriodHertz(50);
-    servo_1.attach(gpio_servo_1, 1000, 2000);
+    servo_1.attach(_gpio_servo_1, 1000, 2000);
   }
 
   if (WiFi.status() != WL_CONNECTED) {
