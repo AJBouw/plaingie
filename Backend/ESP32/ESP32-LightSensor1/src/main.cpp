@@ -74,6 +74,7 @@ String ipId;
 /**
  * @brief Set IP Id object
  * The Micro Controller Unit's IP address is known as the attribute IP Id.
+ * 
  * @return String IP Id
  */
 String getIPId() {
@@ -84,6 +85,7 @@ String macId;
 /**
  * @brief Set the MAC Id object
  * The Micro Controller Unit's MAC address is known as the attribute MAC Id.
+ * 
  * @return String MAC Id
  */
 String getMACId() {
@@ -109,21 +111,13 @@ bool microControllerUnitIsActivated = false;
 #pragma region | IoT Device : Light Sensor
 int _iotDeviceUId;
 /**
- * @brief Set the IoT device UId object
+ * @brief Set the IoT Device UId object
  * 
  * @param uid 
  */
 void setIoTDeviceUId(int uid) {
   _iotDeviceUId = uid;
 }
-
-/**
- * @brief Light sensors give an analog voltage as an output voltage
- * The output voltage is between 0 and 5 Volt converted into a digital value between 0 and 1023.
- * 10k resistor from analog in 0 to ground.
- */
-int brightnessMinimumValue = 0; // Set by experiment
-int brightnessMaximumValue = 1023; // Set by experiment
 
 int _currentLightIntensity_1;
 /**
@@ -139,9 +133,7 @@ void getLightIntensity(int gpio) {
  * @brief The LDR (light sensor) has to be connected to ADC1 pin using WiFi
  * For ESP32 Wroom this is GPIO 32-36, 39
  */
-int gpio_light_sensor_1 = 36;
-
-int _gpio_light_sensor_1;
+int _gpio_light_sensor_1 = 36;
 /**
  * @brief Set the GPIO object
  * 
@@ -157,6 +149,7 @@ String _category;
 /**
  * @brief Set the Category object
  * The device's category can be light, light sensor, motion sensor, servo, and webcam.
+ * 
  * @param category 
  */
 void setCategory(String category) {
@@ -167,6 +160,7 @@ String _identifier;
 /**
  * @brief Set the Identifier object
  * The identifier is the name of the device.
+ * 
  * @param identifier 
  */
 void setIdentifier(String identifier) {
@@ -178,6 +172,7 @@ String _locationDescription;
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
  * device's location.
+ * 
  * @param locationDescription 
  */
 void setLocationDescription(String locationDescription) {
@@ -187,7 +182,10 @@ void setLocationDescription(String locationDescription) {
 String _locationLabel;
 /**
  * @brief Set the Location Label object
- * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
+ * Initially. the location label will be backyard.
+ * In future the location label can also be for example
+ * attic, backyard, bedroom, front yard, kitchen, living room.
+ * 
  * @param locationLabel 
  */
 void setLocationLabel(String locationLabel) {
@@ -198,6 +196,7 @@ bool _isActive;
 /**
  * @brief Set the IoT ddevice state object
  * The IoT device can be active or inactive.
+ * 
  * @param isActive 
  */
 void setIoTDeviceState(bool isActive) {
@@ -208,7 +207,7 @@ bool iotDeviceIsVerified = false;
 #pragma endregion
 
 /**
- * @brief Set the IoT device object
+ * @brief Set the IoT Device object
  * 
  * @param uid 
  * @param category
@@ -243,11 +242,7 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
   docMicroControllerUnit["mac_id"] = macId;
   docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
-  // TODO: verify if this is okay or use size_t n
-  // Save a few CPU cycles by passing the size of the payload
-  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
-  
-  // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
+  // Produce a minified JSON document
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   return jsonMicroControllerUnit;
@@ -311,6 +306,7 @@ void connectToWiFi() {
  * Before permitting MQTT communication the activation must be successfully completed.
  * Each topic the Micro Controller Unit is subscribed
  * the payload is parsed with deserializeJson()
+ * 
  * @param topic 
  * @param payload 
  * @param length 
@@ -361,14 +357,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int iotDeviceUId = docMessage["uid"];
-    String category = docMessage["category"];
-    String gpio = docMessage["gpio"];
-    String identifier = docMessage["identifier"];
-    bool isActive = docMessage["is_active"];
-    String locationDescription = docMessage["location_description"];
-    String locationLabel = docMessage["location_label"];
-    int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
+    int iotDeviceUId = docMessage[0]["uid"];
+    String category = docMessage[0]["category"];
+    String gpio = docMessage[0]["gpio"];
+    String identifier = docMessage[0]["identifier"];
+    bool isActive = docMessage[0]["is_active"];
+    String locationDescription = docMessage[0]["location_description"];
+    String locationLabel = docMessage[0]["location_label"];
+    int microControllerUnitUId = docMessage[0]["micro_controller_unit_uid"];
     
     if (microControllerUnitUId == _microControllerUnitUId) {
       setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
@@ -436,7 +432,7 @@ void reconnectToMQTTBroker() {
 void setup() {
   Serial.begin(115200);
   
-  pinMode(gpio_light_sensor_1, INPUT);
+  pinMode(_gpio_light_sensor_1, INPUT);
 
   connectToWiFi();
   connectToMQTTBroker();
@@ -467,7 +463,7 @@ void loop() {
     mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
   }
   
-  getLightIntensity(gpio_light_sensor_1);
+  getLightIntensity(_gpio_light_sensor_1);
   now = millis();
   iotDeviceIsVerified = true;
   if (iotDeviceIsVerified && (_currentLightIntensity_1 != previousLightIntensity_1) && ((now - lastMessageLightSensor_1) > LIGHT_EVENT_INTERVAL)) {
