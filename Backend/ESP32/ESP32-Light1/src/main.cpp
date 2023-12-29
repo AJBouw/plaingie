@@ -69,14 +69,6 @@ char jsonMicroControllerUnit[256];
 
 #pragma region | Micro Controller Unit
 int _microControllerUnitUId = 1;
-/**
- * @brief Set the Micro Controller Unit UId object
- * 
- * @param uid 
- */
-void setMicroControllerUnitUId(int uid) {
-  _microControllerUnitUId = uid;
-}
 
 String ipId;
 /**
@@ -125,8 +117,7 @@ void setIoTDeviceUId(int uid) {
   _iotDeviceUId = uid;
 }
 
-int gpio_light_1 = 4;
-int _gpio_light_1;
+int _gpio_light_1 = 4;
 /**
  * @brief Set the GPIO object
  * 
@@ -139,7 +130,9 @@ void setGPIO(String gpio) {
 String _category;
 /**
  * @brief Set the Category object
- * The device's category can be light, light sensor, motion sensor, servo, and webcam.
+ * Initially, the device's categories will be
+ * light, light sensor, motion sensor, servo, and webcam.
+ * 
  * @param category 
  */
 void setCategory(String category) {
@@ -150,6 +143,7 @@ String _identifier;
 /**
  * @brief Set the Identifier object
  * The identifier is the name of the device.
+ * 
  * @param identifier 
  */
 void setIdentifier(String identifier) {
@@ -161,6 +155,7 @@ String _locationDescription;
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
  * device's location.
+ * 
  * @param locationDescription 
  */
 void setLocationDescription(String locationDescription) {
@@ -170,7 +165,10 @@ void setLocationDescription(String locationDescription) {
 String _locationLabel;
 /**
  * @brief Set the Location Label object
- * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
+ * Initially. the location label will be backyard.
+ * In future the location label can also be for example
+ * attic, backyard, bedroom, front yard, kitchen, living room.
+ * 
  * @param locationLabel 
  */
 void setLocationLabel(String locationLabel) {
@@ -181,6 +179,7 @@ bool _isActive;
 /**
  * @brief Set the IoT Device State object
  * The IoT device can be active or inactive.
+ * 
  * @param isActive 
  */
 void setIoTDeviceState(bool isActive) {
@@ -196,6 +195,7 @@ int previousLightStatus_1;
 /**
  * @brief Get the Light Status object
  * Read the current Light Status.
+ * 
  * @param gpio 
  * @return int Value 1, the light is turned on, and
  * value is 2, the light is turned off.
@@ -224,6 +224,7 @@ String _currentOperatingMode_1;
 /**
  * @brief Set the Operating Mode object
  * The operation mode can be manual, brightness, motion, and complete.
+ * 
  * @param operatingMode 
  */
 void setOperatingMode(String operatingMode) {
@@ -306,7 +307,7 @@ void setLightStatusByApp(int gpio, int lightCommand) {
 }
 
 /**
- * @brief Set the light status object by light intensity
+ * @brief Set the Light Status object by light intensity
  * 
  * @param gpio 
  * @param lightIntensity 
@@ -338,7 +339,7 @@ void setLightStatusByLightIntensity(int gpio, int lightIntensity) {
 }
 
 /**
- * @brief Set the light status object by motion
+ * @brief Set the Light Status object by motion
  * 
  * @param gpio 
  * @param motionIsDetected 
@@ -369,11 +370,7 @@ char* getJSONActivationRequest( String macId, String mqttClientUId) {
   docMicroControllerUnit["mac_id"] = macId;
   docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
-  // TODO: verify if this is okay or use size_t n
-  // Save a few CPU cycles by passing the size of the payload
-  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
-  
-  // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
+  // Produce a minified JSON document
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   return jsonMicroControllerUnit;
@@ -463,14 +460,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print(deserializationError.c_str());
     }
 
-    int iotDeviceUId = docMessage["uid"];
-    String category = docMessage["category"];
-    String gpio = docMessage["gpio"];
-    String identifier = docMessage["identifier"];
-    bool isActive = docMessage["is_active"];
-    String locationDescription = docMessage["location_description"];
-    String locationLabel = docMessage["location_label"];
-    int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
+    int iotDeviceUId = docMessage[0]["uid"];
+    String category = docMessage[0]["category"];
+    String gpio = docMessage[0]["gpio"];
+    String identifier = docMessage[0]["identifier"];
+    bool isActive = docMessage[0]["is_active"];
+    String locationDescription = docMessage[0]["location_description"];
+    String locationLabel = docMessage[0]["location_label"];
+    int microControllerUnitUId = docMessage[0]["micro_controller_unit_uid"];
     
     String operatingMode = docMessage["operating_mode"];
     int status = docMessage["status"];
@@ -478,6 +475,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     int visibilityDark = docMessage["visbility_dark"];
     int visibilityDim = docMessage["visibility_dim"];
 
+    Serial.println("set iot device");
+    Serial.println(iotDeviceUId);
+    Serial.println(microControllerUnitUId);
+    Serial.println(_microControllerUnitUId);
     if (microControllerUnitUId == _microControllerUnitUId) {
       setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
       setVisibility(visibilityBright, visibilityDark, visibilityDim);
@@ -489,7 +490,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         setLightStatusByLightIntensity(_gpio_light_1, lightIntensity_1);
       }
       else if (operatingMode == "motion") {
-        setLightStatusByMotion(gpio_light_1, motionIsDetected_1);
+        setLightStatusByMotion(_gpio_light_1, motionIsDetected_1);
       }
 
       iotDeviceIsVerified = true;
@@ -513,29 +514,32 @@ void callback(char* topic, byte* payload, unsigned int length) {
       int lightStatus = docLightData["status"];
       Serial.println(iotDeviceUId);
       Serial.println(lightStatus);
+      Serial.println(_iotDeviceUId);
+      Serial.println(_currentLightStatus_1);
 
-      // TODO Scenario
-      // If operating mode is brightness and brightness is the opposit of the light command.
-      if ((iotDeviceUId == _iotDeviceUId) && (lightStatus != _currentLightStatus_1)) {
-        setLightStatusByApp(gpio_light_1, lightStatus);
+      if ((lightStatus == 0) || (lightStatus == 1)) {
+        if ((iotDeviceUId == _iotDeviceUId) && (lightStatus != _currentLightStatus_1) && (_currentOperatingMode_1 != "brightness")) {
+          setLightStatusByApp(_gpio_light_1, lightStatus);
 
-        // Clear JsonDocument
-        docLightData.clear();
+          // Clear JsonDocument
+          docLightData.clear();
 
-        // Serialize a JsonDocument into a MQTT message
-        docLightData["uid"] = _iotDeviceUId;
-        docLightData["status"] = lightStatus;
-        docLightData["operating_mode"] = _currentOperatingMode_1;
-        docLightData["visibility_bright"] = _visibilityBright;
-        docLightData["visibility_dark"] = _visibilityDark;
-        docLightData["visibility_dim"] = _visibilityDim;
-        
-        // Save a few CPU cycles by passing the size of the payload
-        size_t n = serializeJson(docLightData, jsonLightData);
-        
-        mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonLightData, n);
+          // Serialize a JsonDocument into a MQTT message
+          docLightData["uid"] = _iotDeviceUId;
+          docLightData["status"] = lightStatus;
+          docLightData["operating_mode"] = _currentOperatingMode_1;
+          docLightData["visibility_bright"] = _visibilityBright;
+          docLightData["visibility_dark"] = _visibilityDark;
+          docLightData["visibility_dim"] = _visibilityDim;
+          
+          // Save a few CPU cycles by passing the size of the payload
+          // Produce a minified JSON document
+          size_t n = serializeJson(docLightData, jsonLightData);
+          
+          mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonLightData, n);
 
-        previousLightStatus_1 = _currentLightStatus_1;
+          previousLightStatus_1 = _currentLightStatus_1;
+        }
       }
     }
 
@@ -561,7 +565,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if ((iotDeviceUId == _iotDeviceUId) && (lightIntensity != lightIntensity)) {
           lightIntensity_1 = lightIntensity;
           Serial.println("SetLightStatusByLightIntensity");
-          setLightStatusByLightIntensity(gpio_light_1, lightIntensity_1);
+          setLightStatusByLightIntensity(_gpio_light_1, lightIntensity_1);
 
           // Clear JsonDocument
           docLightData.clear();
@@ -575,6 +579,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
           docLightData["visibility_dim"] = _visibilityDim;
           
           // Save a few CPU cycles by passing the size of the payload
+          // Produce a minified JSON document
           size_t n = serializeJson(docLightData, jsonLightData);
           
           mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonLightData, n);
@@ -601,7 +606,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         bool motionIsDetected = docMotionSensorData["motion_is_detected"];
         
         if ((iotDeviceUId == _iotDeviceUId) && (motionIsDetected != motionIsDetected_1)) {
-          setLightStatusByMotion(gpio_light_1, motionIsDetected);
+          setLightStatusByMotion(_gpio_light_1, motionIsDetected);
 
           // Clear JsonDocument
           docLightData.clear();
@@ -615,6 +620,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
           docLightData["visibility_dim"] = _visibilityDim;
           
           // Save a few CPU cycles by passing the size of the payload
+          // Produce a minified JSON document
           size_t n = serializeJson(docLightData, jsonLightData);
           
           mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonLightData, n);
@@ -650,43 +656,20 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.println("previouslightstatus");
       Serial.println(previousLightStatus_1);
       if ((operatingMode != previousOperatingMode_1) && (operatingMode== "manual")) {
-        setLightStatusByApp(gpio_light_1, 0);
+        setLightStatusByApp(_gpio_light_1, 0);
       }
       else if ((operatingMode != previousOperatingMode_1) && (operatingMode == "brightness")) {
         Serial.println("lightIntensity");
         Serial.println(lightIntensity_1);
-        setLightStatusByLightIntensity(gpio_light_1, lightIntensity_1);
+        setLightStatusByLightIntensity(_gpio_light_1, lightIntensity_1);
       }
       else if ((operatingMode != previousOperatingMode_1) && (operatingMode == "motion")) {
         Serial.println("motion is detected");
         Serial.println(String(motionIsDetected_1));
-        setLightStatusByMotion(gpio_light_1, motionIsDetected_1);
+        setLightStatusByMotion(_gpio_light_1, motionIsDetected_1);
       }
       previousOperatingMode_1 = _currentOperatingMode_1;
       previousLightStatus_1 = _currentLightStatus_1;
-      // DONE
-      // brightness to motion
-      // set operating mode
-      // setLightStatusByMotion
-
-      // DONE
-      // motion to brightness
-      // set operating mode
-      // setLightStatusByLightIntensity
-
-      // DONE
-      // manual to brightness
-      // set operating mode
-      // setLightStatusByLightIntensity
-
-      // DONE
-      // manual to motion
-      // set operating mode
-      // setLightStatusByMotion
-
-      // DONE
-      // brightness/motion to manual
-      // set operating mode
     }
 
     if (String(topic) == HOME_BACKYARD_LIGHT_1_COMMAND_VISIBILITY) {
@@ -710,19 +693,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
         setVisibility(visibilityBright, visibilityDark, visibilityDim);
       }
       
-      
-      // if (_operatingMode == "brightness") {
-      //   // verify current brightness
-        
-      //   // getLightStatus(gpio_light_1);
-      //   if (previousLightStatus_1 != _currentLightStatus_1) {
-
-      //   }
-      //   // adjust light status according brightness if applicable
-      //   // setLightStatus(gpio, lightStatus);
-        
-      // }
-
       // Clear JsonDocument
       docLightData.clear();
 
@@ -735,6 +705,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
       docLightData["visibility_dim"] = _visibilityDim;
       
       // Save a few CPU cycles by passing the size of the payload
+      // Produce a minified JSON document
       size_t n = serializeJson(docLightData, jsonLightData);
       
       mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonLightData, n);
@@ -806,7 +777,7 @@ void reconnectToMQTTBroker() {
 void setup() {
   Serial.begin(115200);
   
-  pinMode(gpio_light_1, OUTPUT);
+  pinMode(_gpio_light_1, OUTPUT);
 
   connectToWiFi();
   connectToMQTTBroker();
@@ -829,12 +800,12 @@ void loop() {
     reconnectToMQTTBroker();
   }
 
+  mqttClient.loop();
+
   now = millis();
   if (((!microControllerUnitIsActivated && !iotDeviceIsVerified) || (microControllerUnitIsActivated && !iotDeviceIsVerified)) && ((now - lastVerifyIsActiveAttempt) > MQTT_VERIFY_IS_ACTIVE_EVENT_INTERVAL)) {
     lastVerifyIsActiveAttempt = now;
     mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
   }
-
-  mqttClient.loop();
 }
 #pragma endregion
