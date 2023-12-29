@@ -75,6 +75,7 @@ String ipId;
 /**
  * @brief Set IP Id object
  * The Micro Controller Unit's IP address is known as the attribute IP Id.
+ * 
  * @return String IP Id
  */
 String getIPId() {
@@ -109,9 +110,8 @@ bool microControllerUnitIsActivated = false;
 
 #pragma region | Device : Motion Sensor
 int _iotDeviceUId;
-
 /**
- * @brief Set the IoTDevice UId object
+ * @brief Set the IoT Device UId object
  * 
  * @param uid 
  */
@@ -119,10 +119,8 @@ void setIoTDeviceUId(int uid) {
   _iotDeviceUId = uid;
 }
 
-int gpio_motion_sensor_1 = 2;
 // 4, 21, 22, 23
-
-int _gpio_motion_sensor_1;
+int _gpio_motion_sensor_1 = 2;
 /**
  * @brief Set the GPIO object
  * 
@@ -156,7 +154,8 @@ String _locationDescription;
 /**
  * @brief Set the Location Description object
  * Optionally the location description can provide additional information about the
- * IoT device's location.
+ * device's location.
+ * 
  * @param locationDescription 
  */
 void setLocationDescription(String locationDescription) {
@@ -166,7 +165,10 @@ void setLocationDescription(String locationDescription) {
 String _locationLabel;
 /**
  * @brief Set the Location Label object
- * The location label can be for example attic, backyard, bedroom, front yard, kitchen, living room.
+ * Initially. the location label will be backyard.
+ * In future the location label can also be for example
+ * attic, backyard, bedroom, front yard, kitchen, living room.
+ * 
  * @param locationLabel 
  */
 void setLocationLabel(String locationLabel) {
@@ -177,6 +179,7 @@ bool _isActive;
 /**
  * @brief Set the IoT Device State object
  * The IoT device can be active or inactive.
+ * 
  * @param isActive 
  */
 void setIoTDeviceState(bool isActive) {
@@ -230,11 +233,7 @@ char* getJSONActivationRequest(String macId, String mqttClientUId) {
   docMicroControllerUnit["mac_id"] = macId;
   docMicroControllerUnit["mqtt_client_uid"] = mqttClientUId;
 
-  // TODO: verify if this is okay or use size_t n
-  // Save a few CPU cycles by passing the size of the payload
-  // size_t n = serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
-  
-  // mqttClient.publish(HOME_BACKYARD_LIGHT_1_LIGHT_DATA, jsonData, n);
+  // Produce a minified JSON document
   serializeJson(docMicroControllerUnit, jsonMicroControllerUnit);
   
   return jsonMicroControllerUnit;
@@ -255,10 +254,7 @@ char* getJSONMotionSensorData(int iotDeviceUId, bool motionIsDetected) {
   docMotionSensorData["iot_device_uid"] = iotDeviceUId;
   docMotionSensorData["motion_is_detected"] = motionIsDetected;
 
-  // TODO: verify if this is okay or use size_t n
-  // Save a few CPU cycles by passing the size of the payload
-  // size_t n = serializeJson(docMotionSensorData, jsonMotionSensorData);
-  
+  // Produce a minified JSON document
   serializeJson(docMotionSensorData, jsonMotionSensorData);
   Serial.println("json motion sensor " + String(jsonMotionSensorData));
   return jsonMotionSensorData;
@@ -298,6 +294,7 @@ void connectToWiFi() {
  * Before permitting MQTT communication the activation must be successfully completed.
  * Each topic the Micro Controller Unit is subscribed
  * the payload is parsed with deserializeJson()
+ * 
  * @param topic 
  * @param payload 
  * @param length 
@@ -347,19 +344,18 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (deserializationError) {
       Serial.print(deserializationError.c_str());
     }
-    int iotDeviceUId = docMessage["uid"];
-    String category = docMessage["category"];
-    String gpio = docMessage["gpio"];
-    String identifier = docMessage["identifier"];
-    bool isActive = docMessage["is_active"];
-    String locationDescription = docMessage["location_description"];
-    String locationLabel = docMessage["location_label"];
-    int microControllerUnitUId = docMessage["micro_controller_unit_uid"];
-    
 
+    int iotDeviceUId = docMessage[0]["uid"];
+    String category = docMessage[0]["category"];
+    String gpio = docMessage[0]["gpio"];
+    String identifier = docMessage[0]["identifier"];
+    bool isActive = docMessage[0]["is_active"];
+    String locationDescription = docMessage[0]["location_description"];
+    String locationLabel = docMessage[0]["location_label"];
+    int microControllerUnitUId = docMessage[0]["micro_controller_unit_uid"];
+    
     if (microControllerUnitUId == _microControllerUnitUId) {
       setIoTDevice(iotDeviceUId, category, gpio, identifier, isActive, locationDescription, locationLabel);
-    
       iotDeviceIsVerified = true;
     }
   }
@@ -425,7 +421,7 @@ void setup() {
   Serial.begin(115200);
   
   delay(CALIBRATION_EVENT_INTERVAL);
-  pinMode(gpio_motion_sensor_1, INPUT);
+  pinMode(_gpio_motion_sensor_1, INPUT);
   Serial.println("MOTION_SENSOR_1 attached");
 
   connectToWiFi();
@@ -457,7 +453,7 @@ void loop() {
     mqttClient.publish(ACTIVATION_REQUEST, getJSONActivationRequest(macId, mqttClientUId));
   }
   
-  getMotionSensor_1(gpio_motion_sensor_1);
+  getMotionSensor_1(_gpio_motion_sensor_1);
   now = millis();
   iotDeviceIsVerified = true;
   if (iotDeviceIsVerified && _motionIsDetectedSensor_1 && !motionWasDetectedSensor_1) {
@@ -478,19 +474,5 @@ void loop() {
     Serial.println("motion has stopped " + String(_motionIsDetectedSensor_1));
     mqttClient.publish(HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA, getJSONMotionSensorData(_iotDeviceUId, _motionIsDetectedSensor_1));
   }
-  // // true                       true                        false
-  // if (iotDeviceIsVerified && (motionIsDetectedSensor_1 != motionWasDetectedSensor_1)) {
-  //   Serial.println("Motion is detected sensor 1");
-  //   mqttClient.publish(HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA, getJSONMotionSensorData(_iotDeviceUId, motionIsDetectedSensor_1));
-  //   motionWasDetectedSensor_1 = motionIsDetectedSensor_1;
-  // }
-  // // true                     true                       true
-  // if (iotDeviceIsVerified && (!motionIsDetectedSensor_1 != motionWasDetectedSensor_1) && ((now - lastMessageMotionSensor_1) > MOTION_EVENT_INTERVAL)) {
-  //   Serial.println("Motion has stopped sensor 1");
-  //   motionIsDetectedSensor_1 = false;
-  //   mqttClient.publish(HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA, getJSONMotionSensorData(_iotDeviceUId, motionIsDetectedSensor_1));
-  //   motionWasDetectedSensor_1 = motionIsDetectedSensor_1;
-  // }
-  
 }
 #pragma endregion
