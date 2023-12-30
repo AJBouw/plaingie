@@ -3,6 +3,7 @@ import application_business_rules.use_cases.iot_device_handler as iot_device_han
 import application_business_rules.use_cases.light_data_handler as light_data_handler
 import application_business_rules.use_cases.light_sensor_data_handler as light_sensor_data_handler
 import application_business_rules.use_cases.motion_sensor_data_handler as motion_sensor_data_handler
+import application_business_rules.use_cases.servo_data_handler as servo_data_handler
 import json
 import os
 
@@ -14,6 +15,7 @@ HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA = os.getenv('HOME_BACKYARD_LIGHT_
 HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA = os.getenv('HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA')
 HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION = os.getenv('HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION')
 HOME_BACKYARD_SERVO_1_COMMAND_START_POSITION = os.getenv('HOME_BACKYARD_SERVO_1_COMMAND_START_POSITION')
+HOME_BACKYARD_SERVO_1_SERVO_DATA = os.getenv('HOME_BACKYARD_SERVO_1_SERVO_DATA')
 
 
 def data_handler(mqtt_client, topic, payload):
@@ -30,6 +32,8 @@ def data_handler(mqtt_client, topic, payload):
         handle_light_sensor_data(payload)
     elif topic == HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA:
         handle_motion_sensor_data(payload)
+    elif topic == HOME_BACKYARD_SERVO_1_SERVO_DATA:
+        handle_servo_data(payload)
     elif topic == HOME_BACKYARD_LIGHT_1_COMMAND_LIGHT_SWITCH:
         pass
     elif topic == HOME_BACKYARD_LIGHT_1_COMMAND_LIGHT_SWITCH:
@@ -102,6 +106,26 @@ def deserialize_motion_sensor_data(payload):
     global motion_is_detected
     json_dictionary = json.loads(str(payload.decode('utf-8')))
     motion_is_detected = json_dictionary['motion_is_detected']
+
+
+def handle_servo_data(payload):
+    try:
+        deserialize_iot_device_uid(payload)
+        # Validate iot_device_uid is_active
+        iot_device_is_active = iot_device_handler.read_iot_device_by_uid_where_is_active(iot_device_uid)
+        if iot_device_is_active:
+            deserialize_servo_data(payload)
+            servo_data_handler.create_servo_data_record(iot_device_uid, current_position, start_position)
+    except Exception as ex:
+        custom_logging.warning('Error occured while attempting to store servo data | %s', ex) 
+
+
+def deserialize_servo_data(payload):
+    global current_position
+    global start_position
+    json_dictionary = json.loads(str(payload.decode('utf-8')))
+    current_position = json_dictionary['current_position']
+    start_position = json_dictionary['start_position']
 
 
 def deserialize_iot_device_uid(payload):
