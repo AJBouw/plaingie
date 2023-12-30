@@ -11,6 +11,9 @@ HOME_BACKYARD_LIGHT_1_COMMAND_OPERATING_MODE = os.getenv('HOME_BACKYARD_LIGHT_1_
 HOME_BACKYARD_LIGHT_1_COMMAND_VISIBILITY = os.getenv('HOME_BACKYARD_LIGHT_1_COMMAND_VISIBILITY')
 HOME_BACKYARD_LIGHT_1_LIGHT_DATA = os.getenv('HOME_BACKYARD_LIGHT_1_LIGHT_DATA')
 HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA = os.getenv('HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA')
+HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA = os.getenv('HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA')
+HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION = os.getenv('HOME_BACKYARD_SERVO_1_COMMAND_CURRENT_POSITION')
+HOME_BACKYARD_SERVO_1_COMMAND_START_POSITION = os.getenv('HOME_BACKYARD_SERVO_1_COMMAND_START_POSITION')
 
 
 def data_handler(mqtt_client, topic, payload):
@@ -25,7 +28,13 @@ def data_handler(mqtt_client, topic, payload):
         handle_light_data(payload)
     elif topic == HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA:
         handle_light_sensor_data(payload)
+    elif topic == HOME_BACKYARD_MOTION_SENSOR_1_MOTION_SENSOR_DATA:
+        handle_motion_sensor_data(payload)
     elif topic == HOME_BACKYARD_LIGHT_1_COMMAND_LIGHT_SWITCH:
+        pass
+    elif topic == HOME_BACKYARD_LIGHT_1_COMMAND_LIGHT_SWITCH:
+        pass
+    elif topic == HOME_BACKYARD_LIGHT_1_COMMAND_VISIBILITY:
         pass
     else:
         custom_logging.warning('Unknown topic published to \
@@ -75,6 +84,24 @@ def deserialize_light_sensor_data(payload):
     global light_intensity
     json_dictionary = json.loads(str(payload.decode('utf-8')))
     light_intensity = json_dictionary['light_intensity']
+
+
+def handle_motion_sensor_data(payload):
+    try:
+        deserialize_iot_device_uid(payload)
+        # Validate iot_device_uid is_active
+        iot_device_is_active = iot_device_handler.read_iot_device_by_uid_where_is_active(iot_device_uid)
+        if iot_device_is_active:
+            deserialize_motion_sensor_data(payload)
+            motion_sensor_data_handler.create_motion_sensor_data_record(iot_device_uid, motion_is_detected)
+    except Exception as ex:
+        custom_logging.warning('Error occured while attempting to store motion sensor data | %s', ex) 
+
+
+def deserialize_motion_sensor_data(payload):
+    global motion_is_detected
+    json_dictionary = json.loads(str(payload.decode('utf-8')))
+    motion_is_detected = json_dictionary['motion_is_detected']
 
 
 def deserialize_iot_device_uid(payload):
