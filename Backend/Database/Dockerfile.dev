@@ -1,0 +1,2 @@
+# Pull an official base image from Docker Hub
+FROM postgres:latest

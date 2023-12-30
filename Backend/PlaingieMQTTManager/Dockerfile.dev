@@ -1,0 +1,30 @@
+# Pull an official base image from Docker Hub
+FROM python:3.11.4-slim
+
+# Setup work directory
+WORKDIR /usr/src
+
+# Set environment variables
+# Prevent Python from writing pyc files to disc (equivalent to python -B option)
+ENV PYTHONDONTWRITEBYTECODE 1
+# Prevent Python from buffering stdout and stderr (equivalent to python -u option)
+ENV PYTHONUNBUFFERED 1
+
+# Update Advanced Package Tool (APT)
+RUN apt-get update
+# Install system dependencies
+RUN apt-get install -y g++ libpq-dev gcc && apt-get install -y netcat-traditional
+
+# Install dependencies
+RUN pip install --upgrade pip
+
+# Copy requirements
+COPY ./requirements.txt /usr/src/requirements.txt
+# Install requirements
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project
+COPY . /usr/src
+
+# Configure and run the container
+CMD ["python", "-u", "app.py"]
