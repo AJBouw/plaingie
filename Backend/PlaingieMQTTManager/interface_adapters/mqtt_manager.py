@@ -1,7 +1,8 @@
 from application_business_rules.interactors.audit_and_logging.custom_logging_init import custom_logging
 import application_business_rules.use_cases.iot_device_handler as iot_device_handler
-import application_business_rules.use_cases.micro_controller_unit_handler as mcu_handler
 import application_business_rules.use_cases.light_data_handler as light_data_handler
+import application_business_rules.use_cases.light_sensor_data_handler as light_sensor_data_handler
+import application_business_rules.use_cases.motion_sensor_data_handler as motion_sensor_data_handler
 import json
 import os
 
@@ -9,6 +10,7 @@ HOME_BACKYARD_LIGHT_1_COMMAND_LIGHT_SWITCH = os.getenv('HOME_BACKYARD_LIGHT_1_CO
 HOME_BACKYARD_LIGHT_1_COMMAND_OPERATING_MODE = os.getenv('HOME_BACKYARD_LIGHT_1_COMMAND_OPERATING_MODE')
 HOME_BACKYARD_LIGHT_1_COMMAND_VISIBILITY = os.getenv('HOME_BACKYARD_LIGHT_1_COMMAND_VISIBILITY')
 HOME_BACKYARD_LIGHT_1_LIGHT_DATA = os.getenv('HOME_BACKYARD_LIGHT_1_LIGHT_DATA')
+HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA = os.getenv('HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA')
 
 
 def data_handler(mqtt_client, topic, payload):
@@ -21,6 +23,8 @@ def data_handler(mqtt_client, topic, payload):
     """
     if topic == HOME_BACKYARD_LIGHT_1_LIGHT_DATA:
         handle_light_data(payload)
+    elif topic == HOME_BACKYARD_LIGHT_SENSOR_1_LIGHT_SENSOR_DATA:
+        handle_light_sensor_data(payload)
     elif topic == HOME_BACKYARD_LIGHT_1_COMMAND_LIGHT_SWITCH:
         pass
     else:
@@ -53,6 +57,24 @@ def deserialize_light_data(payload):
     visibility_bright = json_dictionary['visibility_bright']
     visibility_dark = json_dictionary['visibility_dark']
     visibility_dim = json_dictionary['visibility_dim']
+
+
+def handle_light_sensor_data(payload):
+    try:
+        deserialize_iot_device_uid(payload)
+        # Validate iot_device_uid is_active
+        iot_device_is_active = iot_device_handler.read_iot_device_by_uid_where_is_active(iot_device_uid)
+        if iot_device_is_active:
+            deserialize_light_sensor_data(payload)
+            light_sensor_data_handler.create_light_sensor_data_record(iot_device_uid, light_intensity)
+    except Exception as ex:
+        custom_logging.warning('Error occured while attempting to store light sensor data | %s', ex) 
+
+
+def deserialize_light_sensor_data(payload):
+    global light_intensity
+    json_dictionary = json.loads(str(payload.decode('utf-8')))
+    light_intensity = json_dictionary['light_intensity']
 
 
 def deserialize_iot_device_uid(payload):
